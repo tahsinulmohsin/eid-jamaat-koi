@@ -2,6 +2,8 @@
 
 > **Find Eid Jamaat timings near you — crowdsourced, real-time, and open-source.**
 
+**🌐 Live Demo: [https://eid-jamaat-koi.vercel.app/](https://eid-jamaat-koi.vercel.app/)**
+
 A mobile-first web app for discovering and reporting Eid prayer (Jamaat) timings at nearby mosques. Built entirely with vanilla web technologies — no build tools required.
 
 ![Status](https://img.shields.io/badge/status-live-brightgreen)
