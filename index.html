@@ -1,0 +1,994 @@
+<!DOCTYPE html>
+<html lang="bn" dir="ltr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Eid Jamaat Koi | ঈদ জামাত কই</title>
+  <meta name="description" content="Find Eid Jamaat timings near you. Crowdsourced prayer times from mosques across Bangladesh. ঈদের জামাতের সময়সূচী খুঁজুন।" />
+  <meta name="theme-color" content="#065f46" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🕌</text></svg>" />
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwindcss.config = {
+      theme: {
+        extend: {
+          colors: {
+            emerald: {
+              950: '#022c22',
+            }
+          },
+          fontFamily: {
+            sans: ['Inter', 'Noto Sans Bengali', 'system-ui', 'sans-serif'],
+            bengali: ['Noto Sans Bengali', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Leaflet CSS & JS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+
+  <!-- Supabase JS Client (CDN) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+Bengali:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: 'Inter', 'Noto Sans Bengali', system-ui, sans-serif; }
+
+    /* Loading screen */
+    #loading-screen {
+      background: linear-gradient(135deg, #064e3b 0%, #022c22 50%, #0f172a 100%);
+      transition: opacity 0.5s ease, visibility 0.5s ease;
+    }
+    #loading-screen.hide { opacity: 0; visibility: hidden; }
+
+    .pulse-ring {
+      animation: pulseRing 1.8s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+    }
+    @keyframes pulseRing {
+      0%   { transform: scale(0.5); opacity: 0.8; }
+      80%, 100% { transform: scale(2.2); opacity: 0; }
+    }
+
+    .pulse-dot {
+      animation: pulseDot 1.8s cubic-bezier(0.455, 0.03, 0.515, 0.955) infinite;
+    }
+    @keyframes pulseDot {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.15); }
+    }
+
+    /* Toast */
+    .toast {
+      animation: slideUp 0.4s ease, fadeOut 0.5s ease 3.5s forwards;
+    }
+    @keyframes slideUp {
+      from { transform: translateY(100%); opacity: 0; }
+      to   { transform: translateY(0); opacity: 1; }
+    }
+    @keyframes fadeOut {
+      to { opacity: 0; transform: translateY(20px); }
+    }
+
+    /* Map */
+    #map-container { height: calc(100vh - 220px); min-height: 400px; }
+
+    /* User marker pulse */
+    .user-marker-pulse {
+      width: 20px; height: 20px;
+      background: #10b981;
+      border: 3px solid white;
+      border-radius: 50%;
+      box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.6);
+      animation: markerPulse 2s infinite;
+    }
+    @keyframes markerPulse {
+      0%   { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.6); }
+      70%  { box-shadow: 0 0 0 14px rgba(16, 185, 129, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+    }
+
+    /* Card hover */
+    .mosque-card {
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+    .mosque-card:active { transform: scale(0.985); }
+
+    /* Vote buttons */
+    .vote-btn { transition: all 0.2s ease; }
+    .vote-btn:active { transform: scale(0.9); }
+    .vote-btn.voted-correct {
+      background-color: #d1fae5 !important;
+      border-color: #10b981 !important;
+      color: #065f46 !important;
+    }
+    .vote-btn.voted-incorrect {
+      background-color: #fee2e2 !important;
+      border-color: #ef4444 !important;
+      color: #991b1b !important;
+    }
+
+    /* Modal overlay */
+    .modal-overlay {
+      background: rgba(0, 0, 0, 0.6);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      animation: fadeIn 0.25s ease;
+    }
+    .modal-content {
+      animation: modalSlideUp 0.3s ease;
+    }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes modalSlideUp {
+      from { transform: translateY(30px); opacity: 0; }
+      to   { transform: translateY(0); opacity: 1; }
+    }
+
+    /* Scrollbar */
+    #feed-list::-webkit-scrollbar { width: 4px; }
+    #feed-list::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 4px; }
+
+    /* Pill toggle */
+    .pill-btn {
+      transition: all 0.25s ease;
+    }
+    .pill-btn.active {
+      background-color: #065f46;
+      color: white;
+      box-shadow: 0 2px 8px rgba(6, 95, 70, 0.3);
+    }
+
+    /* Skeleton loader */
+    .skeleton {
+      background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.5s infinite;
+      border-radius: 8px;
+    }
+    @keyframes shimmer {
+      0% { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+
+    /* Leaflet popup overrides */
+    .leaflet-popup-content-wrapper {
+      border-radius: 12px !important;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.12) !important;
+      padding: 0 !important;
+    }
+    .leaflet-popup-content { margin: 0 !important; min-width: 220px; }
+
+    /* Spinner for buttons */
+    .btn-spinner {
+      display: inline-block;
+      width: 14px; height: 14px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+
+<body class="bg-gray-50 text-gray-800 antialiased">
+
+  <!-- ==================== LOADING SCREEN ==================== -->
+  <div id="loading-screen" class="fixed inset-0 z-[9999] flex flex-col items-center justify-center text-white">
+    <div class="relative mb-8">
+      <div class="pulse-ring absolute inset-0 rounded-full border-4 border-emerald-400 opacity-75"></div>
+      <div class="pulse-dot text-6xl">🕌</div>
+    </div>
+    <h1 class="text-2xl font-bold mb-2 font-bengali">ঈদ জামাত কই</h1>
+    <p class="text-emerald-300 text-sm animate-pulse" id="loading-text">Finding nearby mosques...</p>
+    <p class="text-emerald-500 text-xs mt-1">কাছের মসজিদ খুঁজছে...</p>
+  </div>
+
+  <!-- ==================== TOAST CONTAINER ==================== -->
+  <div id="toast-container" class="fixed bottom-20 left-1/2 -translate-x-1/2 z-[100] flex flex-col gap-2 items-center pointer-events-none"></div>
+
+  <!-- ==================== MAIN APP ==================== -->
+  <div id="app" class="min-h-screen flex flex-col opacity-0 transition-opacity duration-500">
+
+    <!-- HEADER -->
+    <header class="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-gray-100 shadow-sm">
+      <div class="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
+        <div>
+          <h1 class="text-lg font-extrabold text-emerald-900 leading-tight">
+            🕌 Eid Jamaat Koi
+          </h1>
+          <p class="text-[11px] text-emerald-600 font-bengali font-medium -mt-0.5">ঈদ জামাত কই</p>
+        </div>
+        <div class="flex items-center gap-3">
+          <div class="hidden sm:flex items-center gap-1.5 text-[11px] text-gray-500 bg-gray-50 px-2.5 py-1 rounded-full">
+            <span class="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span>
+            <span id="stats-text">0 Mosques | Live</span>
+          </div>
+          <button id="btn-add-time" class="bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-900 text-white text-xs font-semibold px-3.5 py-2 rounded-xl shadow-md shadow-emerald-900/20 transition-all flex items-center gap-1.5">
+            <span class="text-base leading-none">+</span>
+            <span class="hidden sm:inline">Add Time</span>
+            <span class="sm:hidden font-bengali">রিপোর্ট দিন</span>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- VIEW TOGGLE -->
+    <div class="sticky top-[65px] z-40 bg-white/95 backdrop-blur-md pb-2 pt-2 border-b border-gray-50">
+      <div class="max-w-lg mx-auto px-4">
+        <div class="flex bg-gray-100 rounded-xl p-1 gap-1">
+          <button id="toggle-feed" class="pill-btn active flex-1 text-sm font-semibold py-2 rounded-lg text-center">
+            📋 Live Feed
+          </button>
+          <button id="toggle-map" class="pill-btn flex-1 text-sm font-semibold py-2 rounded-lg text-center text-gray-500">
+            🗺️ Map View
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- CONTENT AREA -->
+    <main class="flex-1 relative">
+
+      <!-- LIVE FEED VIEW -->
+      <div id="feed-view" class="max-w-lg mx-auto px-4 py-3">
+        <div id="feed-list" class="flex flex-col gap-3 pb-16">
+          <!-- Skeleton loaders (shown while loading) -->
+          <div id="skeletons">
+            <div class="bg-white rounded-xl p-4 border border-gray-100 space-y-3">
+              <div class="skeleton h-5 w-3/4"></div>
+              <div class="skeleton h-4 w-1/2"></div>
+              <div class="skeleton h-4 w-2/3"></div>
+              <div class="flex gap-2 mt-2"><div class="skeleton h-8 w-20"></div><div class="skeleton h-8 w-20"></div></div>
+            </div>
+            <div class="bg-white rounded-xl p-4 border border-gray-100 space-y-3 mt-3">
+              <div class="skeleton h-5 w-2/3"></div>
+              <div class="skeleton h-4 w-1/2"></div>
+              <div class="skeleton h-4 w-3/5"></div>
+              <div class="flex gap-2 mt-2"><div class="skeleton h-8 w-20"></div><div class="skeleton h-8 w-20"></div></div>
+            </div>
+            <div class="bg-white rounded-xl p-4 border border-gray-100 space-y-3 mt-3">
+              <div class="skeleton h-5 w-1/2"></div>
+              <div class="skeleton h-4 w-2/5"></div>
+              <div class="skeleton h-4 w-3/4"></div>
+              <div class="flex gap-2 mt-2"><div class="skeleton h-8 w-20"></div><div class="skeleton h-8 w-20"></div></div>
+            </div>
+          </div>
+          <!-- Cards injected here -->
+        </div>
+      </div>
+
+      <!-- MAP VIEW -->
+      <div id="map-view" class="hidden">
+        <div id="map-container" class="w-full"></div>
+      </div>
+
+    </main>
+
+    <!-- FOOTER -->
+    <footer class="sticky bottom-0 z-40 bg-white border-t border-gray-100 shadow-[0_-2px_10px_rgba(0,0,0,0.04)]">
+      <div class="max-w-lg mx-auto px-4 py-2.5 text-center">
+        <p class="text-[10px] text-gray-400 leading-snug">
+          Server costs sponsored by <a href="#" class="font-semibold text-emerald-700 hover:underline">Giggly Gadgets</a> – Check out our Eid tech deals.
+        </p>
+      </div>
+    </footer>
+  </div>
+
+  <!-- ==================== SUBMISSION MODAL ==================== -->
+  <div id="modal-overlay" class="modal-overlay fixed inset-0 z-[200] hidden items-center justify-center p-4">
+    <div class="modal-content bg-white rounded-2xl shadow-2xl w-full max-w-md mx-auto overflow-hidden">
+      <!-- Modal Header -->
+      <div class="flex items-center justify-between px-5 py-4 border-b border-gray-100 bg-emerald-50/50">
+        <div>
+          <h2 class="text-lg font-bold text-emerald-900">+ Report Jamaat Time</h2>
+          <p class="text-xs text-emerald-600 font-bengali">জামাতের সময় জানান</p>
+        </div>
+        <button id="modal-close" class="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 transition-colors text-lg">&times;</button>
+      </div>
+      <!-- Modal Body -->
+      <form id="report-form" class="px-5 py-5 space-y-4">
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 mb-1.5">Mosque <span class="font-bengali text-gray-400 text-xs">(মসজিদ)</span></label>
+          <select id="modal-mosque-select" class="w-full border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-shadow">
+            <option value="">Select a mosque...</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 mb-1.5">Jamaat Time <span class="font-bengali text-gray-400 text-xs">(জামাতের সময়)</span></label>
+          <input type="time" id="modal-time" class="w-full border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-shadow" required />
+        </div>
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 mb-1.5">Upload Notice Board Photo <span class="text-gray-400 text-xs">(optional)</span></label>
+          <div class="border-2 border-dashed border-gray-200 rounded-xl p-4 text-center hover:border-emerald-400 transition-colors cursor-pointer" id="upload-area">
+            <input type="file" id="modal-photo" accept="image/*" class="hidden" />
+            <p class="text-gray-400 text-sm" id="upload-label">📷 Tap to upload photo</p>
+          </div>
+        </div>
+        <button type="submit" id="submit-btn" class="w-full bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-900 text-white font-semibold py-3 rounded-xl shadow-lg shadow-emerald-900/20 transition-all text-sm flex items-center justify-center gap-2">
+          <span id="submit-btn-text">Submit Report / জমা দিন</span>
+          <span id="submit-btn-spinner" class="btn-spinner hidden"></span>
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ==================== JAVASCRIPT ==================== -->
+  <script>
+    // =============================================================
+    //  SUPABASE CONFIGURATION
+    //  ⬇️ Paste your Supabase project URL and anon key below ⬇️
+    // =============================================================
+    const SUPABASE_URL = 'https://vipnubhujyfbfujdgchj.supabase.co';
+    const SUPABASE_KEY = 'sb_publishable_15vFo2GC3m_CJD0-Oou0pQ_RiipId-l';
+
+    // Initialize Supabase client (safely — CDN may fail to load)
+    // NOTE: Variable named 'db' to avoid shadowing window.supabase (the CDN library)
+    let db = null;
+    try {
+      if (window.supabase && window.supabase.createClient && SUPABASE_URL !== 'YOUR_SUPABASE_URL') {
+        db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+      }
+    } catch (e) {
+      console.warn('Supabase init failed:', e);
+    }
+
+    // ===== STATE =====
+    const state = {
+      userLat: null,
+      userLon: null,
+      mosques: [],        // Processed OSM mosques merged with Supabase reports
+      reports: [],        // Raw Supabase jamaat_reports
+      reportsMap: {},     // osm_node_id -> report object (for fast lookup)
+      map: null,
+      markersLayer: null,
+      activeView: 'feed',
+      usingDefault: false,
+    };
+
+    // ===== CONSTANTS =====
+    const DEFAULT_LAT = 23.7276;
+    const DEFAULT_LON = 90.3854;
+    const SEARCH_RADIUS = 5000; // meters
+
+    // ===== HAVERSINE =====
+    function haversine(lat1, lon1, lat2, lon2) {
+      const R = 6371;
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLon = (lon2 - lon1) * Math.PI / 180;
+      const a = Math.sin(dLat / 2) ** 2 +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                Math.sin(dLon / 2) ** 2;
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    }
+
+    // ===== TOAST =====
+    function showToast(message, type = 'info') {
+      const container = document.getElementById('toast-container');
+      const colors = {
+        info: 'bg-gray-800 text-white',
+        success: 'bg-emerald-700 text-white',
+        warning: 'bg-amber-600 text-white',
+        error: 'bg-red-600 text-white',
+      };
+      const toast = document.createElement('div');
+      toast.className = `toast ${colors[type]} px-5 py-3 rounded-xl shadow-lg text-sm font-medium pointer-events-auto max-w-sm text-center`;
+      toast.textContent = message;
+      container.appendChild(toast);
+      setTimeout(() => toast.remove(), 4200);
+    }
+
+    // ===== GEOLOCATION =====
+    function getUserLocation() {
+      return new Promise((resolve) => {
+        if (!navigator.geolocation) {
+          resolve({ lat: DEFAULT_LAT, lon: DEFAULT_LON, fallback: true });
+          return;
+        }
+        navigator.geolocation.getCurrentPosition(
+          (pos) => resolve({ lat: pos.coords.latitude, lon: pos.coords.longitude, fallback: false }),
+          () => resolve({ lat: DEFAULT_LAT, lon: DEFAULT_LON, fallback: true }),
+          { timeout: 8000, enableHighAccuracy: true, maximumAge: 60000 }
+        );
+      });
+    }
+
+    // ===============================================================
+    //  OVERPASS API — Fetch nearby mosques (radius-based, fast)
+    // ===============================================================
+    async function fetchMosquesFromOSM(lat, lon) {
+      const query = `
+        [out:json][timeout:25];
+        (
+          node["amenity"="place_of_worship"]["religion"="muslim"](around:${SEARCH_RADIUS},${lat},${lon});
+          way["amenity"="place_of_worship"]["religion"="muslim"](around:${SEARCH_RADIUS},${lat},${lon});
+        );
+        out center body;
+      `;
+      const url = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`;
+
+      try {
+        const loadingText = document.getElementById('loading-text');
+        if (loadingText) loadingText.textContent = 'Finding nearby mosques...';
+
+        // Abort fetch after 20 seconds to prevent infinite hang
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 20000);
+
+        const res = await fetch(url, { signal: controller.signal });
+        clearTimeout(timeoutId);
+
+        if (!res.ok) throw new Error('Overpass API error');
+        const data = await res.json();
+        const elements = (data.elements || []).map(el => {
+          if (el.type === 'way' && el.center) {
+            el.lat = el.center.lat;
+            el.lon = el.center.lon;
+          }
+          return el;
+        }).filter(el => el.lat && el.lon);
+        return elements;
+      } catch (err) {
+        console.error('Overpass fetch failed:', err);
+        showToast('Could not fetch mosque data. Showing cached results.', 'warning');
+        return generateFallbackMosques(lat, lon);
+      }
+    }
+
+    // Fallback mosques if API fails — real Dhaka mosques with actual coordinates
+    function generateFallbackMosques(lat, lon) {
+      const mosques = [
+        { name: 'বায়তুল মুকাররম জাতীয় মসজিদ', lat: 23.7285, lon: 90.4109 },
+        { name: 'আজিমপুর জামে মসজিদ', lat: 23.7275, lon: 90.3845 },
+        { name: 'লালবাগ কেল্লা মসজিদ', lat: 23.7190, lon: 90.3886 },
+        { name: 'ধানমন্ডি জামে মসজিদ', lat: 23.7462, lon: 90.3723 },
+        { name: 'গুলশান কেন্দ্রীয় মসজিদ', lat: 23.7918, lon: 90.4154 },
+        { name: 'মিরপুর শাহ আলী মসজিদ', lat: 23.8042, lon: 90.3685 },
+        { name: 'উত্তরা মডেল জামে মসজিদ', lat: 23.8736, lon: 90.3990 },
+        { name: 'ঢাকা বিশ্ববিদ্যালয় কেন্দ্রীয় মসজিদ', lat: 23.7331, lon: 90.3930 },
+        { name: 'তারা মসজিদ (পুরান ঢাকা)', lat: 23.7088, lon: 90.3994 },
+        { name: 'হাতিরপুল জামে মসজিদ', lat: 23.7393, lon: 90.3921 },
+        { name: 'কাকরাইল মসজিদ', lat: 23.7378, lon: 90.4089 },
+        { name: 'চকবাজার শাহী মসজিদ', lat: 23.7164, lon: 90.4011 },
+        { name: 'মোহাম্মদপুর জামে মসজিদ', lat: 23.7657, lon: 90.3586 },
+        { name: 'BCSIR Central Mosque', lat: 23.7291, lon: 90.3843 },
+        { name: 'নিউমার্কেট জামে মসজিদ', lat: 23.7334, lon: 90.3842 },
+      ];
+      return mosques.map((m, i) => ({
+        type: 'node',
+        id: 9000 + i,
+        lat: m.lat,
+        lon: m.lon,
+        tags: { name: m.name, amenity: 'place_of_worship', religion: 'muslim' }
+      }));
+    }
+
+    // ===============================================================
+    //  SUPABASE — Fetch all jamaat_reports
+    // ===============================================================
+    async function fetchReportsFromSupabase() {
+      if (!db) return []; // Supabase not initialized
+      try {
+        const { data, error } = await db
+          .from('jamaat_reports')
+          .select('*');
+        if (error) throw error;
+        return data || [];
+      } catch (err) {
+        console.error('Supabase fetch failed:', err);
+        return [];
+      }
+    }
+
+    // ===============================================================
+    //  MERGE — Cross-reference OSM data with Supabase reports
+    // ===============================================================
+    function mergeDataAndProcess(rawOsmElements, reports, userLat, userLon) {
+      // Build a lookup: osm_node_id -> report
+      const reportsMap = {};
+      reports.forEach(r => {
+        const key = String(r.osm_node_id);
+        // If multiple reports for same mosque, keep the most recent one
+        if (!reportsMap[key] || new Date(r.created_at) > new Date(reportsMap[key].created_at)) {
+          reportsMap[key] = r;
+        }
+      });
+      state.reportsMap = reportsMap;
+
+      return rawOsmElements
+        .map((el) => {
+          const osmId = String(el.id);
+          const name = el.tags?.name || 'Local Mosque';
+          const dist = haversine(userLat, userLon, el.lat, el.lon);
+          const report = reportsMap[osmId] || null;
+
+          // Format time elapsed from created_at
+          let timeAgo = '';
+          if (report && report.created_at) {
+            const diffMs = Date.now() - new Date(report.created_at).getTime();
+            const mins = Math.floor(diffMs / 60000);
+            if (mins < 60) timeAgo = `${mins} mins ago`;
+            else if (mins < 1440) timeAgo = `${Math.floor(mins / 60)}h ago`;
+            else timeAgo = `${Math.floor(mins / 1440)}d ago`;
+          }
+
+          // Format jamaat_time for display (24h "HH:MM" -> "H:MM AM/PM")
+          let displayTime = null;
+          if (report && report.jamaat_time) {
+            const parts = report.jamaat_time.split(':');
+            if (parts.length >= 2) {
+              let h = parseInt(parts[0], 10);
+              const m = parts[1].padStart(2, '0');
+              const ampm = h >= 12 ? 'PM' : 'AM';
+              if (h > 12) h -= 12;
+              if (h === 0) h = 12;
+              displayTime = `${h}:${m} ${ampm}`;
+            } else {
+              displayTime = report.jamaat_time;
+            }
+          }
+
+          return {
+            id: el.id,
+            osmId,
+            name,
+            lat: el.lat,
+            lon: el.lon,
+            distance: dist,
+            distLabel: dist < 1 ? `${Math.round(dist * 1000)}m` : `${dist.toFixed(1)}km`,
+            // Real data from Supabase (or null)
+            hasReport: !!report,
+            reportId: report?.id || null,
+            jamaatTime: displayTime,
+            upvotes: report?.upvotes ?? 0,
+            downvotes: report?.downvotes ?? 0,
+            timeAgo,
+          };
+        })
+        .sort((a, b) => a.distance - b.distance);
+    }
+
+    // ===============================================================
+    //  RENDER FEED CARDS
+    // ===============================================================
+    function renderFeed(mosques) {
+      const list = document.getElementById('feed-list');
+      const skeletons = document.getElementById('skeletons');
+      if (skeletons) skeletons.remove();
+
+      // Clear previous cards
+      list.querySelectorAll('.mosque-card').forEach(c => c.remove());
+
+      if (mosques.length === 0) {
+        list.innerHTML = `
+          <div class="text-center py-16 text-gray-400">
+            <p class="text-4xl mb-3">🕌</p>
+            <p class="font-semibold text-gray-500">No mosques found nearby</p>
+            <p class="text-sm mt-1">Try enabling location access</p>
+          </div>`;
+        return;
+      }
+
+      mosques.forEach((m, i) => {
+        const card = document.createElement('div');
+        card.className = 'mosque-card bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden';
+        card.setAttribute('data-index', i);
+
+        // Build the time section
+        let timeSection, voteSection;
+
+        if (m.hasReport) {
+          timeSection = `
+            <div class="bg-gray-50 rounded-lg px-3 py-2 mb-3">
+              <p class="text-sm font-semibold text-gray-700">
+                🕐 <span class="text-emerald-800">${m.jamaatTime}</span>
+              </p>
+            </div>`;
+          voteSection = `
+            <div class="flex items-center gap-2">
+              <button onclick="handleVote(this, 'correct', ${i})"
+                      class="vote-btn flex items-center gap-1.5 border border-gray-200 rounded-lg px-3 py-1.5 text-xs font-semibold text-gray-600 bg-white hover:border-emerald-400">
+                ✅ <span class="font-bengali">সঠিক</span> <span class="vote-count">${m.upvotes}</span>
+              </button>
+              <button onclick="handleVote(this, 'incorrect', ${i})"
+                      class="vote-btn flex items-center gap-1.5 border border-gray-200 rounded-lg px-3 py-1.5 text-xs font-semibold text-gray-600 bg-white hover:border-red-400">
+                ❌ <span class="font-bengali">ভুল</span> <span class="vote-count">${m.downvotes}</span>
+              </button>
+            </div>`;
+        } else {
+          timeSection = `
+            <div class="bg-gray-50 rounded-lg px-3 py-2 mb-3">
+              <p class="text-sm text-gray-400 italic">
+                🕐 Not reported yet / এখনো রিপোর্ট হয়নি
+              </p>
+            </div>`;
+          voteSection = ''; // No voting if no report
+        }
+
+        const metaLine = m.hasReport
+          ? `<span>📍 ${m.distLabel}</span><span class="text-gray-200">•</span><span>${m.timeAgo}</span>`
+          : `<span>📍 ${m.distLabel}</span>`;
+
+        card.innerHTML = `
+          <div class="p-4">
+            <div class="flex items-start justify-between gap-3 mb-2.5">
+              <div class="flex-1 min-w-0">
+                <h3 class="font-bold text-gray-900 text-[15px] leading-snug truncate font-bengali">${escapeHtml(m.name)}</h3>
+                <p class="text-xs text-gray-400 mt-0.5 flex items-center gap-1.5">
+                  ${metaLine}
+                </p>
+              </div>
+              ${m.hasReport ? `<span class="shrink-0 bg-emerald-50 text-emerald-700 text-xs font-bold px-2.5 py-1 rounded-lg border border-emerald-100">Reported</span>` : `<span class="shrink-0 bg-gray-50 text-gray-400 text-xs font-medium px-2.5 py-1 rounded-lg border border-gray-100">Pending</span>`}
+            </div>
+            ${timeSection}
+            ${voteSection}
+          </div>`;
+        list.appendChild(card);
+      });
+
+      // Update stats
+      const reportedCount = mosques.filter(m => m.hasReport).length;
+      document.getElementById('stats-text').textContent = `${mosques.length} Mosques | ${reportedCount} Reported`;
+    }
+
+    function escapeHtml(str) {
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    // ===============================================================
+    //  VOTING — Real Supabase updates with optimistic UI
+    // ===============================================================
+    async function handleVote(btn, type, index) {
+      const mosque = state.mosques[index];
+      if (!mosque || !mosque.hasReport || !mosque.reportId) {
+        showToast('No report to vote on.', 'warning');
+        return;
+      }
+
+      const parent = btn.parentElement;
+      const allBtns = parent.querySelectorAll('.vote-btn');
+      const isAlreadyVoted = btn.classList.contains('voted-correct') || btn.classList.contains('voted-incorrect');
+
+      // Remove all vote classes first
+      allBtns.forEach(b => b.classList.remove('voted-correct', 'voted-incorrect'));
+
+      if (isAlreadyVoted) {
+        // Un-vote: decrement
+        if (type === 'correct') mosque.upvotes = Math.max(0, mosque.upvotes - 1);
+        else mosque.downvotes = Math.max(0, mosque.downvotes - 1);
+      } else {
+        // Apply vote
+        if (type === 'correct') {
+          mosque.upvotes++;
+          btn.classList.add('voted-correct');
+        } else {
+          mosque.downvotes++;
+          btn.classList.add('voted-incorrect');
+        }
+      }
+
+      // Optimistic UI update
+      allBtns[0].querySelector('.vote-count').textContent = mosque.upvotes;
+      allBtns[1].querySelector('.vote-count').textContent = mosque.downvotes;
+
+      // Persist to Supabase in background
+      if (!db) return;
+      try {
+        const { error } = await db
+          .from('jamaat_reports')
+          .update({
+            upvotes: mosque.upvotes,
+            downvotes: mosque.downvotes,
+          })
+          .eq('id', mosque.reportId);
+
+        if (error) throw error;
+      } catch (err) {
+        console.error('Vote update failed:', err);
+        showToast('Vote failed to save. Try again.', 'error');
+      }
+    }
+
+    // ===============================================================
+    //  LEAFLET MAP
+    // ===============================================================
+    function initMap(lat, lon, mosques) {
+      if (state.map) {
+        state.map.remove();
+        state.map = null;
+      }
+
+      state.map = L.map('map-container', {
+        zoomControl: false
+      }).setView([lat, lon], 14);
+
+      L.control.zoom({ position: 'bottomright' }).addTo(state.map);
+
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+        maxZoom: 19,
+      }).addTo(state.map);
+
+      // User marker with pulse
+      const userIcon = L.divIcon({
+        className: '',
+        html: '<div class="user-marker-pulse"></div>',
+        iconSize: [20, 20],
+        iconAnchor: [10, 10],
+      });
+      L.marker([lat, lon], { icon: userIcon, zIndexOffset: 1000 })
+        .addTo(state.map)
+        .bindPopup('<div class="p-3 text-center"><strong class="text-emerald-700">📍 You are here</strong></div>');
+
+      // Mosque markers
+      const mosqueIcon = L.divIcon({
+        className: '',
+        html: `<div class="flex items-center justify-center w-8 h-8 bg-emerald-700 rounded-full shadow-lg border-2 border-white text-white text-sm">🕌</div>`,
+        iconSize: [32, 32],
+        iconAnchor: [16, 16],
+      });
+
+      const unreportedIcon = L.divIcon({
+        className: '',
+        html: `<div class="flex items-center justify-center w-8 h-8 bg-gray-400 rounded-full shadow-lg border-2 border-white text-white text-sm">🕌</div>`,
+        iconSize: [32, 32],
+        iconAnchor: [16, 16],
+      });
+
+      mosques.forEach((m) => {
+        const icon = m.hasReport ? mosqueIcon : unreportedIcon;
+        const marker = L.marker([m.lat, m.lon], { icon }).addTo(state.map);
+
+        const popupTime = m.hasReport
+          ? `<div class="bg-emerald-50 rounded-lg px-2.5 py-1.5 mb-2">
+               <p class="text-xs font-semibold text-emerald-800">🕐 ${m.jamaatTime}</p>
+             </div>
+             <p class="text-[11px] text-gray-400">${m.timeAgo}</p>
+             <div class="flex gap-2 mt-2 text-xs">
+               <span class="text-emerald-600 font-medium">✅ ${m.upvotes}</span>
+               <span class="text-red-500 font-medium">❌ ${m.downvotes}</span>
+             </div>`
+          : `<p class="text-xs text-gray-400 italic">Not reported yet</p>`;
+
+        marker.bindPopup(`
+          <div class="p-3.5">
+            <h3 class="font-bold text-sm text-gray-900 mb-1" style="font-family: 'Noto Sans Bengali', sans-serif;">${escapeHtml(m.name)}</h3>
+            <p class="text-xs text-gray-500 mb-2">📍 ${m.distLabel} away</p>
+            ${popupTime}
+          </div>
+        `, { maxWidth: 260 });
+      });
+    }
+
+    // ===============================================================
+    //  VIEW TOGGLE
+    // ===============================================================
+    function setupViewToggle() {
+      const btnFeed = document.getElementById('toggle-feed');
+      const btnMap = document.getElementById('toggle-map');
+      const feedView = document.getElementById('feed-view');
+      const mapView = document.getElementById('map-view');
+
+      function switchTo(view) {
+        state.activeView = view;
+        if (view === 'feed') {
+          btnFeed.classList.add('active');
+          btnMap.classList.remove('active');
+          btnMap.classList.add('text-gray-500');
+          btnFeed.classList.remove('text-gray-500');
+          feedView.classList.remove('hidden');
+          mapView.classList.add('hidden');
+        } else {
+          btnMap.classList.add('active');
+          btnFeed.classList.remove('active');
+          btnFeed.classList.add('text-gray-500');
+          btnMap.classList.remove('text-gray-500');
+          feedView.classList.add('hidden');
+          mapView.classList.remove('hidden');
+          setTimeout(() => {
+            if (state.map) state.map.invalidateSize();
+          }, 100);
+        }
+      }
+
+      btnFeed.addEventListener('click', () => switchTo('feed'));
+      btnMap.addEventListener('click', () => switchTo('map'));
+    }
+
+    // ===============================================================
+    //  MODAL — Real Supabase submission
+    // ===============================================================
+    function setupModal() {
+      const overlay = document.getElementById('modal-overlay');
+      const btnOpen = document.getElementById('btn-add-time');
+      const btnClose = document.getElementById('modal-close');
+      const form = document.getElementById('report-form');
+      const uploadArea = document.getElementById('upload-area');
+      const fileInput = document.getElementById('modal-photo');
+      const uploadLabel = document.getElementById('upload-label');
+      const submitBtn = document.getElementById('submit-btn');
+      const submitBtnText = document.getElementById('submit-btn-text');
+      const submitBtnSpinner = document.getElementById('submit-btn-spinner');
+
+      function openModal() {
+        overlay.classList.remove('hidden');
+        overlay.classList.add('flex');
+        document.body.style.overflow = 'hidden';
+
+        // Populate mosque select with OSM data
+        const sel = document.getElementById('modal-mosque-select');
+        sel.innerHTML = '<option value="">Select a mosque...</option>';
+        state.mosques.forEach((m) => {
+          const opt = document.createElement('option');
+          // Store OSM ID and mosque name as value (pipe-delimited)
+          opt.value = `${m.osmId}|${m.name}`;
+          opt.textContent = `${m.name} (${m.distLabel})`;
+          sel.appendChild(opt);
+        });
+      }
+
+      function closeModal() {
+        overlay.classList.add('hidden');
+        overlay.classList.remove('flex');
+        document.body.style.overflow = '';
+        form.reset();
+        uploadLabel.textContent = '📷 Tap to upload photo';
+        setSubmitLoading(false);
+      }
+
+      function setSubmitLoading(loading) {
+        submitBtn.disabled = loading;
+        submitBtnText.textContent = loading ? 'Submitting...' : 'Submit Report / জমা দিন';
+        submitBtnSpinner.classList.toggle('hidden', !loading);
+        submitBtn.classList.toggle('opacity-70', loading);
+        submitBtn.classList.toggle('cursor-not-allowed', loading);
+      }
+
+      btnOpen.addEventListener('click', openModal);
+      btnClose.addEventListener('click', closeModal);
+      overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) closeModal();
+      });
+
+      // Upload area
+      uploadArea.addEventListener('click', () => fileInput.click());
+      fileInput.addEventListener('change', () => {
+        if (fileInput.files.length > 0) {
+          uploadLabel.textContent = `📎 ${fileInput.files[0].name}`;
+        }
+      });
+
+      // Form submit — insert into Supabase
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const mosqueValue = document.getElementById('modal-mosque-select').value;
+        const time = document.getElementById('modal-time').value;
+
+        if (!mosqueValue || !time) {
+          showToast('Please select a mosque and time.', 'error');
+          return;
+        }
+
+        // Parse the pipe-delimited value
+        const [osmNodeId, mosqueName] = mosqueValue.split('|');
+
+        setSubmitLoading(true);
+
+        try {
+          if (!db) throw new Error('Database not connected');
+          const { data, error } = await db
+            .from('jamaat_reports')
+            .insert({
+              osm_node_id: osmNodeId,
+              mosque_name: mosqueName,
+              jamaat_time: time,
+              upvotes: 0,
+              downvotes: 0,
+            })
+            .select();
+
+          if (error) throw error;
+
+          showToast('Time added successfully! সময় যোগ হয়েছে! ✅', 'success');
+          closeModal();
+
+          // Refresh data to show the new report
+          await refreshData();
+
+        } catch (err) {
+          console.error('Supabase insert failed:', err);
+          showToast('Failed to submit. Please try again. / জমা ব্যর্থ হয়েছে।', 'error');
+          setSubmitLoading(false);
+        }
+      });
+    }
+
+    // ===============================================================
+    //  REFRESH DATA — Re-fetch Supabase and re-render
+    // ===============================================================
+    async function refreshData() {
+      const reports = await fetchReportsFromSupabase();
+      state.reports = reports;
+      state.mosques = mergeDataAndProcess(state.rawOsmElements, reports, state.userLat, state.userLon);
+      renderFeed(state.mosques);
+      initMap(state.userLat, state.userLon, state.mosques);
+    }
+
+    // ===============================================================
+    //  INITIALIZATION
+    // ===============================================================
+    async function init() {
+      const loadingScreen = document.getElementById('loading-screen');
+      const app = document.getElementById('app');
+
+      try {
+        // Step 1: Get user location
+        const loc = await getUserLocation();
+        state.userLat = loc.lat;
+        state.userLon = loc.lon;
+        state.usingDefault = loc.fallback;
+
+        const loadingText = document.getElementById('loading-text');
+        if (loadingText) loadingText.textContent = 'Fetching mosque data...';
+
+        // Step 2: Fetch OSM mosques AND Supabase reports in parallel
+        const [rawOsmElements, reports] = await Promise.all([
+          fetchMosquesFromOSM(loc.lat, loc.lon),
+          fetchReportsFromSupabase(),
+        ]);
+
+        // Store raw OSM data for future refreshes
+        state.rawOsmElements = rawOsmElements;
+        state.reports = reports;
+
+        if (loadingText) loadingText.textContent = 'Merging data...';
+
+        // Step 3: Merge OSM + Supabase data
+        state.mosques = mergeDataAndProcess(rawOsmElements, reports, loc.lat, loc.lon);
+
+        // Step 4: Render
+        renderFeed(state.mosques);
+        initMap(loc.lat, loc.lon, state.mosques);
+
+        // Step 5: Setup interactivity
+        setupViewToggle();
+        setupModal();
+
+        // Step 7: Show fallback toast
+        if (loc.fallback) {
+          setTimeout(() => {
+            showToast('Showing default area. Enable location for nearby results.', 'warning');
+          }, 800);
+        }
+
+      } catch (err) {
+        console.error('Init failed:', err);
+        showToast('Something went wrong. Please refresh.', 'error');
+        // Still setup basic interactivity if possible
+        try { setupViewToggle(); } catch(e) {}
+        try { setupModal(); } catch(e) {}
+      } finally {
+        // ALWAYS dismiss loading screen, no matter what
+        loadingScreen.classList.add('hide');
+        app.classList.remove('opacity-0');
+        app.classList.add('opacity-100');
+        setTimeout(() => loadingScreen.remove(), 600);
+      }
+    }
+
+    // Start
+    document.addEventListener('DOMContentLoaded', init);
+  </script>
+</body>
+</html>
