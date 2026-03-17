@@ -261,13 +261,13 @@
   </div>
 
   <!-- TOAST -->
-  <div id="toast-container" class="fixed bottom-20 left-1/2 -translate-x-1/2 z-[100] flex flex-col gap-2 items-center pointer-events-none"></div>
+  <div id="toast-container" class="fixed bottom-20 left-1/2 -translate-x-1/2 z-[1020] flex flex-col gap-2 items-center pointer-events-none"></div>
 
   <!-- APP -->
   <div id="app" class="min-h-screen flex flex-col opacity-0 transition-opacity duration-500">
 
     <!-- HEADER -->
-    <header class="app-header sticky top-0 z-50 backdrop-blur-md border-b shadow-sm" style="background: var(--bg-surface); opacity: 0.97;">
+    <header class="app-header sticky top-0 z-[1010] backdrop-blur-md border-b shadow-sm" style="background: var(--bg-surface); opacity: 0.97;">
       <div class="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
         <div>
           <h1 class="text-lg font-extrabold leading-tight" style="color: var(--text-accent);">🕌 Eid Jamaat Koi</h1>
@@ -291,7 +291,7 @@
     </header>
 
     <!-- VIEW TOGGLE -->
-    <div class="app-toggle-bar sticky top-[65px] z-40 backdrop-blur-md pb-2 pt-2 border-b" style="background: var(--bg-surface); opacity: 0.97;">
+    <div class="app-toggle-bar sticky top-[65px] z-[1005] backdrop-blur-md pb-2 pt-2 border-b" style="background: var(--bg-surface); opacity: 0.97;">
       <div class="max-w-lg mx-auto px-4">
         <div class="pill-container flex rounded-xl p-1 gap-1">
           <button id="toggle-feed" class="pill-btn active flex-1 text-sm font-semibold py-2 rounded-lg text-center">📋 Live Feed</button>
@@ -324,7 +324,7 @@
     </main>
 
     <!-- FOOTER -->
-    <footer class="app-footer sticky bottom-0 z-40 border-t">
+    <footer class="app-footer sticky bottom-0 z-[1005] border-t">
       <div class="max-w-lg mx-auto px-4 py-2.5 text-center">
         <p class="footer-text text-[10px] leading-snug">
           Server costs sponsored by <a href="#" class="footer-link font-semibold hover:underline">Giggly Gadgets</a> – Check out our Eid tech deals.
@@ -334,7 +334,7 @@
   </div>
 
   <!-- MODAL -->
-  <div id="modal-overlay" class="modal-overlay fixed inset-0 z-[200] hidden items-center justify-center p-4">
+  <div id="modal-overlay" class="modal-overlay fixed inset-0 z-[1030] hidden items-center justify-center p-4">
     <div class="modal-content rounded-2xl shadow-2xl w-full max-w-md mx-auto overflow-hidden">
       <div class="modal-header-bg flex items-center justify-between px-5 py-4">
         <div>
