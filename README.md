@@ -2,9 +2,12 @@
 
 > **Find Eid Jamaat timings near you — crowdsourced, real-time, and open-source.**
 
+🔗 **Live App: [https://eid-jamaat-koi.vercel.app](https://eid-jamaat-koi.vercel.app)**
+
 A mobile-first web app for discovering and reporting Eid prayer (Jamaat) timings at nearby mosques. Built entirely with vanilla web technologies — no build tools required.
 
 ![Status](https://img.shields.io/badge/status-live-brightgreen)
+![Vercel](https://img.shields.io/badge/deployed_on-Vercel-black?logo=vercel)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 ![Made With](https://img.shields.io/badge/made_with-❤️_and_JavaScript-yellow)
 
@@ -13,11 +16,13 @@ A mobile-first web app for discovering and reporting Eid prayer (Jamaat) timings
 ## ✨ Features
 
 - 📍 **Auto-Geolocation** — Detects your GPS coordinates automatically; falls back to Azimpur, Dhaka if denied.
-- 🕌 **Real Mosque Data** — Fetches nearby mosques from OpenStreetMap via the Overpass API (2.5km radius).
+- 🕌 **Real Mosque Data** — Fetches nearby mosques from OpenStreetMap via the Overpass API (5km radius).
 - 📋 **Live Feed** — Scrollable, sorted-by-distance cards with reported Jamaat times, distances, and elapsed time.
 - 🗺️ **Interactive Map** — Full Leaflet.js map with pulsing user marker and clickable mosque markers with popup details.
 - ✅❌ **Voting System** — Upvote (সঠিক) or downvote (ভুল) reported times for community verification.
 - ➕ **Report Times** — Submit new Jamaat timings via a sleek modal form with photo upload support.
+- 🌙 **Dark Mode** — Auto-detects system preference, manual toggle, remembers your choice.
+- 💾 **Supabase Backend** — Real-time database for reports and votes.
 - 🇧🇩 **Bilingual UI** — English and Bengali (বাংলা) labels throughout.
 - 📱 **Mobile-First** — Optimized for smartphones with responsive design.
 
@@ -31,6 +36,7 @@ A mobile-first web app for discovering and reporting Eid prayer (Jamaat) timings
 | **Tailwind CSS** (CDN) | Utility-first styling |
 | **Vanilla JavaScript** | All logic, no frameworks |
 | **Leaflet.js** (CDN) | Interactive map rendering |
+| **Supabase** (CDN) | Database for reports & votes |
 | **OpenStreetMap** | Map tiles & geodata |
 | **Overpass API** | Real-time mosque POI queries |
 
