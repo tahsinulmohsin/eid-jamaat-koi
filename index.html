@@ -277,6 +277,10 @@
     <!-- VIEW TOGGLE -->
     <div class="app-toggle-bar sticky top-[65px] z-[1005] backdrop-blur-md pb-2 pt-2 border-b" style="background: var(--bg-surface); opacity: 0.97;">
       <div class="max-w-lg mx-auto px-4">
+        <div class="relative mb-2">
+          <span class="absolute left-3 top-1/2 -translate-y-1/2 text-[13px]">🔍</span>
+          <input type="text" id="search-input" class="w-full rounded-xl pl-8 pr-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all shadow-sm placeholder-gray-500 dark:placeholder-gray-400" style="background: var(--bg-surface-hover); border: 1px solid var(--border-default); color: var(--text-primary);" placeholder="Search mosques by name...">
+        </div>
         <div class="pill-container flex rounded-xl p-1 gap-1">
           <button id="toggle-feed" class="pill-btn active flex-1 text-sm font-semibold py-2 rounded-lg text-center">📋 Live Feed</button>
           <button id="toggle-map" class="pill-btn flex-1 text-sm font-semibold py-2 rounded-lg text-center">🗺️ Map View</button>
@@ -287,6 +291,10 @@
     <!-- CONTENT -->
     <main class="flex-1 relative">
       <div id="feed-view" class="max-w-lg mx-auto px-4 py-3">
+        <div id="no-search-results" class="hidden text-center py-12">
+          <p class="text-4xl mb-3">🔍</p>
+          <p class="font-semibold" style="color:var(--text-secondary)">No mosques match your search</p>
+        </div>
         <div id="feed-list" class="flex flex-col gap-3 pb-16">
           <div id="skeletons">
             <div class="mosque-card rounded-xl p-4 space-y-3">
@@ -568,6 +576,22 @@
         catch(e){console.error('Insert fail:',e);showToast('Failed to submit. Please try again.','error');setL(false);}});
     }
 
+    function setupSearch() {
+      const inp = document.getElementById('search-input'), noRes = document.getElementById('no-search-results'), list = document.getElementById('feed-list');
+      if(!inp) return;
+      inp.addEventListener('input', (e) => {
+        const q = e.target.value.toLowerCase(); let matchCount = 0;
+        state.mosques.forEach((m, i) => {
+          const match = m.name.toLowerCase().includes(q);
+          const c = list.querySelector(`.mosque-card[data-index="${i}"]`);
+          if (c) c.style.display = match ? 'block' : 'none';
+          if (state.mapMarkers && state.mapMarkers[i]) state.mapMarkers[i].setMap(match ? state.map : null);
+          if (match) matchCount++;
+        });
+        if (noRes) noRes.classList.toggle('hidden', matchCount > 0 || state.mosques.length === 0 || !!document.getElementById('skeletons'));
+      });
+    }
+
     async function refreshData(){const r=await fetchReportsFromSupabase();state.reports=r;state.mosques=mergeDataAndProcess(state.rawOsmElements,r,state.userLat,state.userLon);renderFeed(state.mosques);initMap(state.userLat,state.userLon,state.mosques);}
 
     function waitForGoogleMaps() {
@@ -589,10 +613,10 @@
         renderFeed(state.mosques);
         await waitForGoogleMaps();
         initMap(loc.lat,loc.lon,state.mosques);
-        setupViewToggle();setupModal();setupDarkMode();
+        setupViewToggle();setupModal();setupDarkMode();setupSearch();
         if(loc.fallback)setTimeout(()=>showToast('Showing default area. Enable location for nearby results.','warning'),800);
       }catch(e){console.error('Init fail:',e);showToast('Something went wrong. Please refresh.','error');
-        try{setupViewToggle();}catch(x){}try{setupModal();}catch(x){}try{setupDarkMode();}catch(x){}}
+        try{setupViewToggle();}catch(x){}try{setupModal();}catch(x){}try{setupDarkMode();}catch(x){}try{setupSearch();}catch(x){}}
       finally{ls.classList.add('hide');app.classList.remove('opacity-0');app.classList.add('opacity-100');setTimeout(()=>ls.remove(),600);}
     }
     document.addEventListener('DOMContentLoaded',init);
