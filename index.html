@@ -34,9 +34,8 @@
     }
   </script>
 
-  <!-- Leaflet CSS & JS -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <!-- Google Maps JS API (with Places Library) -->
+  <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyB1LWJhPEmGOtcdAUCrLDlFWfjXQju5_XA&libraries=places&v=weekly" async defer></script>
 
   <!-- Supabase JS Client -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
@@ -137,21 +136,10 @@
 
     /* Map */
     #map-container { height: calc(100vh - 220px); min-height: 400px; }
-    html.dark .leaflet-tile { filter: brightness(0.7) invert(1) contrast(1.1) hue-rotate(200deg) saturate(0.3); }
-    html.dark .leaflet-container { background: #1a1a2e; }
 
-    /* User marker */
-    .user-marker-pulse {
-      width: 20px; height: 20px; background: #10b981;
-      border: 3px solid white; border-radius: 50%;
-      box-shadow: 0 0 0 0 rgba(16,185,129,0.6);
-      animation: markerPulse 2s infinite;
-    }
-    @keyframes markerPulse {
-      0% { box-shadow: 0 0 0 0 rgba(16,185,129,0.6); }
-      70% { box-shadow: 0 0 0 14px rgba(16,185,129,0); }
-      100% { box-shadow: 0 0 0 0 rgba(16,185,129,0); }
-    }
+    /* Google Maps InfoWindow */
+    .gm-style-iw { border-radius: 12px !important; }
+    .gm-style-iw-d { overflow: auto !important; }
 
     /* Header + Footer */
     .app-header, .app-footer, .app-toggle-bar {
@@ -228,10 +216,6 @@
     /* Scrollbar */
     #feed-list::-webkit-scrollbar { width: 4px; }
     #feed-list::-webkit-scrollbar-thumb { background: var(--border-subtle); border-radius: 4px; }
-
-    /* Leaflet popups */
-    .leaflet-popup-content-wrapper { border-radius: 12px !important; box-shadow: 0 4px 20px rgba(0,0,0,0.12) !important; padding: 0 !important; }
-    .leaflet-popup-content { margin: 0 !important; min-width: 220px; }
 
     /* Spinner */
     .btn-spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.3); border-top-color: white; border-radius: 50%; animation: spin 0.6s linear infinite; }
@@ -388,6 +372,7 @@
         const isDark = document.documentElement.classList.toggle('dark');
         localStorage.setItem('theme', isDark ? 'dark' : 'light');
         updateIcon();
+        if (state.map) state.map.setOptions({ styles: getMapStyles() });
       });
 
       window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
@@ -410,7 +395,7 @@
 
     // ===== STATE =====
     const state = { userLat: null, userLon: null, mosques: [], reports: [], reportsMap: {}, map: null, activeView: 'feed', usingDefault: false };
-    const DEFAULT_LAT = 23.7276, DEFAULT_LON = 90.3854, SEARCH_RADIUS = 5000;
+    const DEFAULT_LAT = 23.7276, DEFAULT_LON = 90.3854, SEARCH_RADIUS = 50000;
 
     function haversine(lat1, lon1, lat2, lon2) {
       const R = 6371, dLat = (lat2-lat1)*Math.PI/180, dLon = (lon2-lon1)*Math.PI/180;
@@ -438,10 +423,10 @@
     }
 
     async function fetchMosquesFromOSM(lat, lon) {
-      const q = `[out:json][timeout:25];(node["amenity"="place_of_worship"]["religion"="muslim"](around:${SEARCH_RADIUS},${lat},${lon});way["amenity"="place_of_worship"]["religion"="muslim"](around:${SEARCH_RADIUS},${lat},${lon}););out center body;`;
+      const q = `[out:json][timeout:60];(node["amenity"="place_of_worship"]["religion"="muslim"](around:${SEARCH_RADIUS},${lat},${lon});way["amenity"="place_of_worship"]["religion"="muslim"](around:${SEARCH_RADIUS},${lat},${lon}););out center body;`;
       try {
-        const lt = document.getElementById('loading-text'); if (lt) lt.textContent = 'Finding nearby mosques...';
-        const ctrl = new AbortController(); const tid = setTimeout(() => ctrl.abort(), 20000);
+        const lt = document.getElementById('loading-text'); if (lt) lt.textContent = 'Finding nearby mosques... (this may take a few seconds)';
+        const ctrl = new AbortController(); const tid = setTimeout(() => ctrl.abort(), 60000);
         const res = await fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(q)}`, { signal: ctrl.signal });
         clearTimeout(tid); if (!res.ok) throw new Error('API error');
         return ((await res.json()).elements || []).map(e => { if (e.type==='way'&&e.center) { e.lat=e.center.lat; e.lon=e.center.lon; } return e; }).filter(e => e.lat&&e.lon);
@@ -520,26 +505,48 @@
       catch(e){console.error('Vote fail:',e);showToast('Vote failed to save.','error');}
     }
 
+    const GMAP_DARK_STYLES = [
+      {elementType:'geometry',stylers:[{color:'#212121'}]},{elementType:'labels.icon',stylers:[{visibility:'off'}]},
+      {elementType:'labels.text.fill',stylers:[{color:'#757575'}]},{elementType:'labels.text.stroke',stylers:[{color:'#212121'}]},
+      {featureType:'administrative',elementType:'geometry',stylers:[{color:'#757575'}]},
+      {featureType:'poi',elementType:'geometry',stylers:[{color:'#2a2a2a'}]},{featureType:'poi.park',elementType:'geometry',stylers:[{color:'#263c3f'}]},
+      {featureType:'road',elementType:'geometry.fill',stylers:[{color:'#383838'}]},{featureType:'road',elementType:'geometry.stroke',stylers:[{color:'#212121'}]},
+      {featureType:'road.highway',elementType:'geometry.fill',stylers:[{color:'#484848'}]},
+      {featureType:'transit',elementType:'geometry',stylers:[{color:'#2f2f2f'}]},{featureType:'water',elementType:'geometry',stylers:[{color:'#1a1a2e'}]},
+    ];
+
+    function getMapStyles() {
+      return document.documentElement.classList.contains('dark') ? GMAP_DARK_STYLES : [];
+    }
+
     function initMap(lat,lon,mosques){
-      if(state.map){state.map.remove();state.map=null;}
-      state.map=L.map('map-container',{zoomControl:false}).setView([lat,lon],14);
-      L.control.zoom({position:'bottomright'}).addTo(state.map);
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>',maxZoom:19}).addTo(state.map);
-      const ui=L.divIcon({className:'',html:'<div class="user-marker-pulse"></div>',iconSize:[20,20],iconAnchor:[10,10]});
-      L.marker([lat,lon],{icon:ui,zIndexOffset:1000}).addTo(state.map).bindPopup('<div class="p-3 text-center"><strong class="text-emerald-700">📍 You are here</strong></div>');
-      const mi=L.divIcon({className:'',html:'<div class="flex items-center justify-center w-8 h-8 bg-emerald-700 rounded-full shadow-lg border-2 border-white text-white text-sm">🕌</div>',iconSize:[32,32],iconAnchor:[16,16]});
-      const ui2=L.divIcon({className:'',html:'<div class="flex items-center justify-center w-8 h-8 bg-gray-400 rounded-full shadow-lg border-2 border-white text-white text-sm">🕌</div>',iconSize:[32,32],iconAnchor:[16,16]});
+      const el=document.getElementById('map-container');
+      const isDark=document.documentElement.classList.contains('dark');
+      state.map=new google.maps.Map(el,{center:{lat,lng:lon},zoom:14,zoomControl:true,zoomControlOptions:{position:google.maps.ControlPosition.RIGHT_BOTTOM},
+        mapTypeControl:false,streetViewControl:false,fullscreenControl:false,styles:getMapStyles()});
+      state.mapMarkers=[];
+
+      // User location marker
+      new google.maps.Marker({position:{lat,lng:lon},map:state.map,icon:{path:google.maps.SymbolPath.CIRCLE,scale:10,fillColor:'#10b981',fillOpacity:1,strokeColor:'#ffffff',strokeWeight:3},zIndex:1000,title:'You are here'});
+
+      // Info window (reuse one)
+      const iw=new google.maps.InfoWindow();
+
       mosques.forEach(m=>{
-        const mk=L.marker([m.lat,m.lon],{icon:m.hasReport?mi:ui2}).addTo(state.map);
-        const pt=m.hasReport?`<div class="bg-emerald-50 rounded-lg px-2.5 py-1.5 mb-2"><p class="text-xs font-semibold text-emerald-800">🕐 ${m.jamaatTime}</p></div><p class="text-[11px] text-gray-400">${m.timeAgo}</p><div class="flex gap-2 mt-2 text-xs"><span class="text-emerald-600 font-medium">✅ ${m.upvotes}</span><span class="text-red-500 font-medium">❌ ${m.downvotes}</span></div>`:'<p class="text-xs text-gray-400 italic">Not reported yet</p>';
-        mk.bindPopup(`<div class="p-3.5"><h3 class="font-bold text-sm text-gray-900 mb-1" style="font-family:'Noto Sans Bengali',sans-serif">${escapeHtml(m.name)}</h3><p class="text-xs text-gray-500 mb-2">📍 ${m.distLabel} away</p>${pt}</div>`,{maxWidth:260});
+        const reported=m.hasReport;
+        const mk=new google.maps.Marker({position:{lat:m.lat,lng:m.lon},map:state.map,
+          icon:{url:`data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' width='32' height='32'><circle cx='16' cy='16' r='14' fill='${reported?'%23065f46':'%239ca3af'}' stroke='white' stroke-width='2.5'/><text x='16' y='22' text-anchor='middle' font-size='16'>🕌</text></svg>`)}`,scaledSize:new google.maps.Size(32,32),anchor:new google.maps.Point(16,16)},
+          title:m.name});
+        const pt=reported?`<div style="background:#ecfdf5;border-radius:8px;padding:6px 10px;margin-bottom:8px"><p style="font-size:12px;font-weight:600;color:#065f46">🕐 ${m.jamaatTime}</p></div><p style="font-size:11px;color:#9ca3af">${m.timeAgo}</p><div style="display:flex;gap:8px;margin-top:8px;font-size:12px"><span style="color:#059669;font-weight:500">✅ ${m.upvotes}</span><span style="color:#ef4444;font-weight:500">❌ ${m.downvotes}</span></div>`:'<p style="font-size:12px;color:#9ca3af;font-style:italic">Not reported yet</p>';
+        mk.addListener('click',()=>{iw.setContent(`<div style="padding:14px;min-width:200px;font-family:Inter,'Noto Sans Bengali',sans-serif"><h3 style="font-weight:700;font-size:14px;color:#111827;margin-bottom:4px">${escapeHtml(m.name)}</h3><p style="font-size:12px;color:#6b7280;margin-bottom:8px">📍 ${m.distLabel} away</p>${pt}</div>`);iw.open(state.map,mk);});
+        state.mapMarkers.push(mk);
       });
     }
 
     function setupViewToggle(){
       const bf=document.getElementById('toggle-feed'),bm=document.getElementById('toggle-map'),fv=document.getElementById('feed-view'),mv=document.getElementById('map-view');
       function sw(v){state.activeView=v;if(v==='feed'){bf.classList.add('active');bm.classList.remove('active');fv.classList.remove('hidden');mv.classList.add('hidden');}
-      else{bm.classList.add('active');bf.classList.remove('active');fv.classList.add('hidden');mv.classList.remove('hidden');setTimeout(()=>{if(state.map)state.map.invalidateSize();},100);}}
+      else{bm.classList.add('active');bf.classList.remove('active');fv.classList.add('hidden');mv.classList.remove('hidden');setTimeout(()=>{if(state.map)google.maps.event.trigger(state.map,'resize');},100);}}
       bf.addEventListener('click',()=>sw('feed'));bm.addEventListener('click',()=>sw('map'));
     }
 
@@ -563,15 +570,25 @@
 
     async function refreshData(){const r=await fetchReportsFromSupabase();state.reports=r;state.mosques=mergeDataAndProcess(state.rawOsmElements,r,state.userLat,state.userLon);renderFeed(state.mosques);initMap(state.userLat,state.userLon,state.mosques);}
 
+    function waitForGoogleMaps() {
+      return new Promise(resolve => {
+        if (typeof google !== 'undefined' && google.maps && google.maps.places) { resolve(); return; }
+        const check = setInterval(() => { if (typeof google !== 'undefined' && google.maps && google.maps.places) { clearInterval(check); resolve(); } }, 100);
+        setTimeout(() => { clearInterval(check); resolve(); }, 10000);
+      });
+    }
+
     async function init(){
       const ls=document.getElementById('loading-screen'),app=document.getElementById('app');
       try{
         const loc=await getUserLocation();state.userLat=loc.lat;state.userLon=loc.lon;state.usingDefault=loc.fallback;
         const lt=document.getElementById('loading-text');if(lt)lt.textContent='Fetching mosque data...';
         const[raw,rpts]=await Promise.all([fetchMosquesFromOSM(loc.lat,loc.lon),fetchReportsFromSupabase()]);
-        state.rawOsmElements=raw;state.reports=rpts;if(lt)lt.textContent='Merging data...';
+        state.rawOsmElements=raw;state.reports=rpts;if(lt)lt.textContent='Loading map...';
         state.mosques=mergeDataAndProcess(raw,rpts,loc.lat,loc.lon);
-        renderFeed(state.mosques);initMap(loc.lat,loc.lon,state.mosques);
+        renderFeed(state.mosques);
+        await waitForGoogleMaps();
+        initMap(loc.lat,loc.lon,state.mosques);
         setupViewToggle();setupModal();setupDarkMode();
         if(loc.fallback)setTimeout(()=>showToast('Showing default area. Enable location for nearby results.','warning'),800);
       }catch(e){console.error('Init fail:',e);showToast('Something went wrong. Please refresh.','error');
