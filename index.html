@@ -295,6 +295,17 @@
           <p class="text-4xl mb-3">🔍</p>
           <p class="font-semibold" style="color:var(--text-secondary)">No mosques match your search</p>
         </div>
+        
+        <!-- UPCOMING EID DATES BANNER -->
+        <div id="eid-dates-card" class="bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-100 dark:border-emerald-800 rounded-xl p-4 mb-4 flex items-center justify-between shadow-sm">
+          <div>
+            <h3 class="text-[11px] font-bold text-emerald-800 dark:text-emerald-400 uppercase tracking-widest mb-1.5 flex items-center gap-1.5"><span>🗓️</span> Upcoming Eids</h3>
+            <p class="text-sm font-semibold text-emerald-950 dark:text-emerald-100 mb-0.5" id="eid-fitr-date">Eid al-Fitr: Loading...</p>
+            <p class="text-sm font-semibold text-emerald-950 dark:text-emerald-100" id="eid-adha-date">Eid al-Adha: Loading...</p>
+          </div>
+          <div class="text-3xl opacity-80" style="filter: drop-shadow(0 2px 4px rgba(16,185,129,0.3));">🌙</div>
+        </div>
+
         <div id="feed-list" class="flex flex-col gap-3 pb-16">
           <div id="skeletons">
             <div class="mosque-card rounded-xl p-4 space-y-3">
@@ -431,7 +442,7 @@
     }
 
     async function fetchMosquesFromOSM(lat, lon) {
-      const q = `[out:json][timeout:60];(node["amenity"="place_of_worship"]["religion"="muslim"](around:${SEARCH_RADIUS},${lat},${lon});way["amenity"="place_of_worship"]["religion"="muslim"](around:${SEARCH_RADIUS},${lat},${lon}););out center body;`;
+      const q = `[out:json][timeout:60];(node["amenity"="place_of_worship"]["religion"="muslim"](around:${SEARCH_RADIUS},${lat},${lon});way["amenity"="place_of_worship"]["religion"="muslim"](around:${SEARCH_RADIUS},${lat},${lon});node["name"~"Eidgah|ঈদগাহ",i](around:${SEARCH_RADIUS},${lat},${lon});way["name"~"Eidgah|ঈদগাহ",i](around:${SEARCH_RADIUS},${lat},${lon});node["place_of_worship"="eidgah"](around:${SEARCH_RADIUS},${lat},${lon});way["place_of_worship"="eidgah"](around:${SEARCH_RADIUS},${lat},${lon}););out center body;`;
       try {
         const lt = document.getElementById('loading-text'); if (lt) lt.textContent = 'Finding nearby mosques... (this may take a few seconds)';
         const ctrl = new AbortController(); const tid = setTimeout(() => ctrl.abort(), 60000);
@@ -458,6 +469,33 @@
       if (!db) return [];
       try { const {data,error} = await db.from('jamaat_reports').select('*'); if(error) throw error; return data||[]; }
       catch(e) { console.error('Supabase fetch fail:', e); return []; }
+    }
+
+    async function fetchEidDates() {
+      try {
+        const today = new Date();
+        const d = String(today.getDate()).padStart(2, '0'), m = String(today.getMonth() + 1).padStart(2, '0'), y = today.getFullYear();
+        const tRes = await fetch('https://api.aladhan.com/v1/gToH?date=' + d + '-' + m + '-' + y);
+        const tData = await tRes.json();
+        const hYear = parseInt(tData.data.hijri.year, 10), hMonth = parseInt(tData.data.hijri.month.number, 10);
+        
+        let nF = hYear; if (hMonth > 10) nF++;
+        let nA = hYear; if (hMonth > 12 || (hMonth === 12 && parseInt(tData.data.hijri.day, 10) > 10)) nA++;
+        
+        const [fRes, aRes] = await Promise.all([
+          fetch('https://api.aladhan.com/v1/hToG?date=01-10-' + nF),
+          fetch('https://api.aladhan.com/v1/hToG?date=10-12-' + nA)
+        ]);
+        const fData = await fRes.json(), aData = await aRes.json();
+        const formatDt = (s) => { const d = new Date(s.split('-').reverse().join('-')); return d.toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'}); };
+        
+        document.getElementById('eid-fitr-date').textContent = `Eid al-Fitr: ~${formatDt(fData.data.gregorian.date)}`;
+        document.getElementById('eid-adha-date').textContent = `Eid al-Adha: ~${formatDt(aData.data.gregorian.date)}`;
+      } catch (e) {
+        console.error('Eid dates fetch fail:', e);
+        document.getElementById('eid-fitr-date').textContent = 'Eid al-Fitr: Dates unavailable';
+        document.getElementById('eid-adha-date').textContent = 'Eid al-Adha: Dates unavailable';
+      }
     }
 
     function mergeDataAndProcess(raw, reports, uLat, uLon) {
@@ -607,7 +645,7 @@
       try{
         const loc=await getUserLocation();state.userLat=loc.lat;state.userLon=loc.lon;state.usingDefault=loc.fallback;
         const lt=document.getElementById('loading-text');if(lt)lt.textContent='Fetching mosque data...';
-        const[raw,rpts]=await Promise.all([fetchMosquesFromOSM(loc.lat,loc.lon),fetchReportsFromSupabase()]);
+        const[raw,rpts]=await Promise.all([fetchMosquesFromOSM(loc.lat,loc.lon),fetchReportsFromSupabase(),fetchEidDates()]);
         state.rawOsmElements=raw;state.reports=rpts;if(lt)lt.textContent='Loading map...';
         state.mosques=mergeDataAndProcess(raw,rpts,loc.lat,loc.lon);
         renderFeed(state.mosques);
