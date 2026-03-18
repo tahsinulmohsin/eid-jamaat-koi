@@ -414,7 +414,7 @@
 
     // ===== STATE =====
     const state = { userLat: null, userLon: null, mosques: [], reports: [], reportsMap: {}, map: null, activeView: 'feed', usingDefault: false };
-    const DEFAULT_LAT = 23.7276, DEFAULT_LON = 90.3854, SEARCH_RADIUS = 50000;
+    const DEFAULT_LAT = 23.7276, DEFAULT_LON = 90.3854, SEARCH_RADIUS = 15000;
 
     function haversine(lat1, lon1, lat2, lon2) {
       const R = 6371, dLat = (lat2-lat1)*Math.PI/180, dLon = (lon2-lon1)*Math.PI/180;
@@ -436,13 +436,13 @@
         navigator.geolocation.getCurrentPosition(
           p => r({ lat: p.coords.latitude, lon: p.coords.longitude, fallback: false }),
           () => r({ lat: DEFAULT_LAT, lon: DEFAULT_LON, fallback: true }),
-          { timeout: 8000, enableHighAccuracy: true, maximumAge: 60000 }
+          { timeout: 15000, enableHighAccuracy: true, maximumAge: 60000 }
         );
       });
     }
 
     async function fetchMosquesFromOSM(lat, lon) {
-      const q = `[out:json][timeout:60];(node["amenity"="place_of_worship"]["religion"="muslim"](around:${SEARCH_RADIUS},${lat},${lon});way["amenity"="place_of_worship"]["religion"="muslim"](around:${SEARCH_RADIUS},${lat},${lon});node["name"~"Eidgah|ঈদগাহ",i](around:${SEARCH_RADIUS},${lat},${lon});way["name"~"Eidgah|ঈদগাহ",i](around:${SEARCH_RADIUS},${lat},${lon});node["place_of_worship"="eidgah"](around:${SEARCH_RADIUS},${lat},${lon});way["place_of_worship"="eidgah"](around:${SEARCH_RADIUS},${lat},${lon}););out center body;`;
+      const q = `[out:json][timeout:60];(node["amenity"="place_of_worship"]["religion"="muslim"](around:${SEARCH_RADIUS},${lat},${lon});way["amenity"="place_of_worship"]["religion"="muslim"](around:${SEARCH_RADIUS},${lat},${lon});node["name"~"(Eidgah|eidgah|ঈদগাহ)"](around:${SEARCH_RADIUS},${lat},${lon});way["name"~"(Eidgah|eidgah|ঈদগাহ)"](around:${SEARCH_RADIUS},${lat},${lon});node["place_of_worship"="eidgah"](around:${SEARCH_RADIUS},${lat},${lon});way["place_of_worship"="eidgah"](around:${SEARCH_RADIUS},${lat},${lon}););out center body;`;
       try {
         const lt = document.getElementById('loading-text'); if (lt) lt.textContent = 'Finding nearby mosques... (this may take a few seconds)';
         const ctrl = new AbortController(); const tid = setTimeout(() => ctrl.abort(), 60000);
