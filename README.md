@@ -13,6 +13,15 @@ A mobile-first web app for discovering and reporting Eid prayer (Jamaat) timings
 
 ---
 
+## 📅 Update Logs (v1.1.0)
+- **New:** Replaced Leaflet.js with **Google Maps JavaScript API**.
+- **New:** Expanded search radius exponentially to **50km** to include hundreds of regional mosques.
+- **New:** Added a real-time **Search Bar** to instantly filter both the Live Feed and map markers.
+- **New:** Included explicit Overpass queries to fetch local **"Eidgah"** open-air prayer fields natively.
+- **New:** Integrated the Aladhan API to dynamically calculate and display accurate upcoming Gregorian dates for **Eid al-Fitr** and **Eid al-Adha**.
+
+---
+
 ## ✨ Features
 
 - 📍 **Auto-Geolocation** — Detects your GPS coordinates automatically or defaults to a central fallback.
