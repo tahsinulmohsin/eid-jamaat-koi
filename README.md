@@ -15,10 +15,11 @@ A mobile-first web app for discovering and reporting Eid prayer (Jamaat) timings
 
 ## ✨ Features
 
-- 📍 **Auto-Geolocation** — Detects your GPS coordinates automatically; falls back to Azimpur, Dhaka if denied.
-- 🕌 **Real Mosque Data** — Fetches nearby mosques from OpenStreetMap via the Overpass API (5km radius).
+- 📍 **Auto-Geolocation** — Detects your GPS coordinates automatically or defaults to a central fallback.
+- 🕌 **Real Mosque Data** — Fetches hundreds of mosques across a massive **50km radius** using OpenStreetMap's Overpass API.
+- 🔍 **Real-Time Search** — Filter the live feed and map markers instantly by typing a mosque's name.
 - 📋 **Live Feed** — Scrollable, sorted-by-distance cards with reported Jamaat times, distances, and elapsed time.
-- 🗺️ **Interactive Map** — Full Leaflet.js map with pulsing user marker and clickable mosque markers with popup details.
+- 🗺️ **Interactive Map** — Full Google Maps integration with pulsing user markers and clickable mosque markers with popup details.
 - ✅❌ **Voting System** — Upvote (সঠিক) or downvote (ভুল) reported times for community verification.
 - ➕ **Report Times** — Submit new Jamaat timings via a sleek modal form with photo upload support.
 - 🌙 **Dark Mode** — Auto-detects system preference, manual toggle, remembers your choice.
@@ -35,9 +36,9 @@ A mobile-first web app for discovering and reporting Eid prayer (Jamaat) timings
 | **HTML5** | Structure & semantics |
 | **Tailwind CSS** (CDN) | Utility-first styling |
 | **Vanilla JavaScript** | All logic, no frameworks |
-| **Leaflet.js** (CDN) | Interactive map rendering |
+| **Google Maps API** | Interactive map rendering |
 | **Supabase** (CDN) | Database for reports & votes |
-| **OpenStreetMap** | Map tiles & geodata |
+| **OpenStreetMap** | Geodata source |
 | **Overpass API** | Real-time mosque POI queries |
 
 > **Zero build tools.** No Webpack, no Vite, no npm. Just a single `index.html` file.
