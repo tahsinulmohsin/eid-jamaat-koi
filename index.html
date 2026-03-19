@@ -414,7 +414,7 @@
 
     // ===== STATE =====
     const state = { userLat: null, userLon: null, mosques: [], reports: [], reportsMap: {}, map: null, activeView: 'feed', usingDefault: false };
-    const DEFAULT_LAT = 23.7276, DEFAULT_LON = 90.3854, SEARCH_RADIUS = 15000;
+    const DEFAULT_LAT = 23.7276, DEFAULT_LON = 90.3854, SEARCH_RADIUS = 5000;
 
     function haversine(lat1, lon1, lat2, lon2) {
       const R = 6371, dLat = (lat2-lat1)*Math.PI/180, dLon = (lon2-lon1)*Math.PI/180;
@@ -442,14 +442,28 @@
     }
 
     async function fetchMosquesFromOSM(lat, lon) {
-      const q = `[out:json][timeout:60];(node["amenity"="place_of_worship"]["religion"="muslim"](around:${SEARCH_RADIUS},${lat},${lon});way["amenity"="place_of_worship"]["religion"="muslim"](around:${SEARCH_RADIUS},${lat},${lon});node["name"~"(Eidgah|eidgah|ঈদগাহ)"](around:${SEARCH_RADIUS},${lat},${lon});way["name"~"(Eidgah|eidgah|ঈদগাহ)"](around:${SEARCH_RADIUS},${lat},${lon});node["place_of_worship"="eidgah"](around:${SEARCH_RADIUS},${lat},${lon});way["place_of_worship"="eidgah"](around:${SEARCH_RADIUS},${lat},${lon}););out center body;`;
+      const q = `[out:json][timeout:25];(nwr["amenity"="place_of_worship"]["religion"="muslim"](around:${SEARCH_RADIUS},${lat},${lon});nwr["name"~"Eidgah|eidgah|EIDGAH|ঈদগাহ"](around:${SEARCH_RADIUS},${lat},${lon});nwr["place_of_worship"="eidgah"](around:${SEARCH_RADIUS},${lat},${lon}););out center;`;
       try {
-        const lt = document.getElementById('loading-text'); if (lt) lt.textContent = 'Finding nearby mosques... (this may take a few seconds)';
-        const ctrl = new AbortController(); const tid = setTimeout(() => ctrl.abort(), 60000);
+        const lt = document.getElementById('loading-text'); if (lt) lt.textContent = 'Finding nearby mosques...';
+        const ctrl = new AbortController(); const tid = setTimeout(() => ctrl.abort(), 25000);
         const res = await fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(q)}`, { signal: ctrl.signal });
         clearTimeout(tid); if (!res.ok) throw new Error('API error');
-        return ((await res.json()).elements || []).map(e => { if (e.type==='way'&&e.center) { e.lat=e.center.lat; e.lon=e.center.lon; } return e; }).filter(e => e.lat&&e.lon);
-      } catch(e) { console.error('Overpass fail:', e); showToast('Could not fetch mosque data. Showing cached results.', 'warning'); return generateFallbackMosques(lat,lon); }
+        const data = await res.json();
+        const arr = (data.elements || []).map(e => { if (e.type!=='node'&&e.center) { e.lat=e.center.lat; e.lon=e.center.lon; } return e; }).filter(e => e.lat&&e.lon);
+        localStorage.setItem('cached_mosques', JSON.stringify({ lat, lon, data: arr }));
+        return arr;
+      } catch(e) { 
+        console.error('Overpass fail:', e); 
+        const cached = localStorage.getItem('cached_mosques');
+        if (cached) {
+          try {
+            const p = JSON.parse(cached);
+            if (Math.abs(p.lat-lat)<0.05 && Math.abs(p.lon-lon)<0.05) return p.data;
+          } catch(x){}
+        }
+        showToast('Could not fetch mosque data. Showing cached results.', 'warning'); 
+        return generateFallbackMosques(lat,lon); 
+      }
     }
 
     function generateFallbackMosques() {
