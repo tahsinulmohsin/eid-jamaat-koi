@@ -22,6 +22,7 @@ A mobile-first web app for discovering and reporting Eid prayer (Jamaat) timings
 - **Fix:** Reduced search radius to 5km and optimized regex matching to prevent Overpass API server timeouts. Increased geolocation timeout for better GPS reliability.
 - **Fix:** Resolved an Overpass API syntax error (HTTP 400 Bad Request) caused by an unescaped case-insensitive regex modifier that forced the app to fall back to hardcoded default coordinates.
 - **Architecture:** Permanently migrated data fetching from OpenStreetMap Overpass API to **Google Places API** utilizing a concurrent, paginated search algorithm for 100% reliable, instantaneous loading.
+- **New:** Eid dates now dynamically adjust based on user's **GPS location**. A custom longitudinal algorithm applies a +1-day offset for regions East of 60° longitude (South Asia, Southeast Asia, Oceania) to match real-world physical moon sighting practices.
 
 ---
 
