@@ -566,17 +566,48 @@
       }
     }
 
+    function formatTime(timeStr) {
+      if (!timeStr) return null;
+      const p = timeStr.split(':');
+      if (p.length >= 2) {
+        let h = parseInt(p[0], 10); const m = p[1].padStart(2, '0'), ap = h >= 12 ? 'PM' : 'AM';
+        if (h > 12) h -= 12; if (h === 0) h = 12; return `${h}:${m} ${ap}`;
+      }
+      return timeStr;
+    }
+
+    function formatTimeAgo(created_at) {
+      if (!created_at) return '';
+      const mn = Math.floor((Date.now() - new Date(created_at).getTime()) / 60000);
+      return mn < 60 ? `${mn} mins ago` : mn < 1440 ? `${Math.floor(mn / 60)}h ago` : `${Math.floor(mn / 1440)}d ago`;
+    }
+
     function mergeDataAndProcess(raw, reports, uLat, uLon) {
-      const rm = {}; reports.forEach(r => { const k=String(r.osm_node_id); if(!rm[k]||new Date(r.created_at)>new Date(rm[k].created_at)) rm[k]=r; });
+      // Group ALL reports by osm_node_id
+      const rm = {};
+      reports.forEach(r => {
+        const k = String(r.osm_node_id);
+        if (!rm[k]) rm[k] = [];
+        rm[k].push(r);
+      });
       state.reportsMap = rm;
       return raw.map(el => {
-        const osmId=String(el.id), name=el.tags?.name||'Local Mosque', dist=haversine(uLat,uLon,el.lat,el.lon), rpt=rm[osmId]||null;
-        let timeAgo='';
-        if(rpt&&rpt.created_at){const mn=Math.floor((Date.now()-new Date(rpt.created_at).getTime())/60000);timeAgo=mn<60?`${mn} mins ago`:mn<1440?`${Math.floor(mn/60)}h ago`:`${Math.floor(mn/1440)}d ago`;}
-        let dTime=null;
-        if(rpt&&rpt.jamaat_time){const p=rpt.jamaat_time.split(':');if(p.length>=2){let h=parseInt(p[0],10);const m=p[1].padStart(2,'0'),ap=h>=12?'PM':'AM';if(h>12)h-=12;if(h===0)h=12;dTime=`${h}:${m} ${ap}`;}else dTime=rpt.jamaat_time;}
-        return{id:el.id,osmId,name,lat:el.lat,lon:el.lon,distance:dist,distLabel:dist<1?`${Math.round(dist*1000)}m`:`${dist.toFixed(1)}km`,hasReport:!!rpt,reportId:rpt?.id||null,jamaatTime:dTime,upvotes:rpt?.upvotes??0,downvotes:rpt?.downvotes??0,timeAgo};
-      }).sort((a,b)=>a.distance-b.distance);
+        const osmId = String(el.id), name = el.tags?.name || 'Local Mosque', dist = haversine(uLat, uLon, el.lat, el.lon);
+        const rpts = (rm[osmId] || []).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+        const allTimes = rpts.map(r => ({
+          id: r.id,
+          jamaatTime: formatTime(r.jamaat_time),
+          upvotes: r.upvotes ?? 0,
+          downvotes: r.downvotes ?? 0,
+          timeAgo: formatTimeAgo(r.created_at)
+        }));
+        return {
+          id: el.id, osmId, name, lat: el.lat, lon: el.lon, distance: dist,
+          distLabel: dist < 1 ? `${Math.round(dist * 1000)}m` : `${dist.toFixed(1)}km`,
+          hasReport: allTimes.length > 0,
+          reports: allTimes
+        };
+      }).sort((a, b) => a.distance - b.distance);
     }
 
     function renderFeed(mosques) {
@@ -585,20 +616,26 @@
       if(!mosques.length){list.innerHTML=`<div class="text-center py-16"><p class="text-4xl mb-3">🕌</p><p class="font-semibold" style="color:var(--text-secondary)">No mosques found nearby</p><p class="text-sm mt-1" style="color:var(--text-muted)">Try enabling location access</p></div>`;return;}
       mosques.forEach((m,i)=>{
         const c=document.createElement('div');c.className='mosque-card rounded-xl shadow-sm overflow-hidden';c.setAttribute('data-index',i);
-        let ts,vs;
+        let timesHtml;
         if(m.hasReport){
-          ts=`<div class="card-time-box rounded-lg px-3 py-2 mb-3"><p class="text-sm font-semibold" style="color:var(--text-secondary)">🕐 <span class="card-time-text">${m.jamaatTime}</span></p></div>`;
-          vs=`<div class="flex items-center gap-2">
-            <button onclick="handleVote(this,'correct',${i})" class="vote-btn flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold">✅ <span class="font-bengali">সঠিক</span> <span class="vote-count">${m.upvotes}</span></button>
-            <button onclick="handleVote(this,'incorrect',${i})" class="vote-btn flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold">❌ <span class="font-bengali">ভুল</span> <span class="vote-count">${m.downvotes}</span></button>
-          </div>`;
+          timesHtml = m.reports.map((r, ri) => `
+            <div class="card-time-box rounded-lg px-3 py-2 mb-2">
+              <div class="flex items-center justify-between gap-2">
+                <p class="text-sm font-semibold" style="color:var(--text-secondary)">🕐 <span class="card-time-text">${r.jamaatTime}</span></p>
+                <span class="text-xs" style="color:var(--text-muted)">${r.timeAgo}</span>
+              </div>
+              <div class="flex items-center gap-2 mt-1.5">
+                <button onclick="handleVote(this,'correct',${i},${ri})" class="vote-btn flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold">✅ <span class="font-bengali">সঠিক</span> <span class="vote-count">${r.upvotes}</span></button>
+                <button onclick="handleVote(this,'incorrect',${i},${ri})" class="vote-btn flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold">❌ <span class="font-bengali">ভুল</span> <span class="vote-count">${r.downvotes}</span></button>
+              </div>
+            </div>
+          `).join('');
         } else {
-          ts=`<div class="card-time-box rounded-lg px-3 py-2 mb-3"><p class="card-time-pending text-sm italic">🕐 Not reported yet / এখনো রিপোর্ট হয়নি</p></div>`;
-          vs='';
+          timesHtml=`<div class="card-time-box rounded-lg px-3 py-2 mb-3"><p class="card-time-pending text-sm italic">🕐 Not reported yet / এখনো রিপোর্ট হয়নি</p></div>`;
         }
-        const ml=m.hasReport?`<span>📍 ${m.distLabel}</span><span class="dot-sep">•</span><span>${m.timeAgo}</span>`:`<span>📍 ${m.distLabel}</span>`;
-        const badge=m.hasReport?`<span class="card-badge-reported shrink-0 text-xs font-bold px-2.5 py-1 rounded-lg">Reported</span>`:`<span class="card-badge-pending shrink-0 text-xs font-medium px-2.5 py-1 rounded-lg">Pending</span>`;
-        c.innerHTML=`<div class="p-4"><div class="flex items-start justify-between gap-3 mb-2.5"><div class="flex-1 min-w-0"><h3 class="card-title font-bold text-[15px] leading-snug truncate font-bengali">${escapeHtml(m.name)}</h3><p class="card-meta text-xs mt-0.5 flex items-center gap-1.5">${ml}</p></div>${badge}</div>${ts}${vs}</div>`;
+        const ml=`<span>📍 ${m.distLabel}</span>`;
+        const badge=m.hasReport?`<span class="card-badge-reported shrink-0 text-xs font-bold px-2.5 py-1 rounded-lg">${m.reports.length} Time${m.reports.length>1?'s':''}</span>`:`<span class="card-badge-pending shrink-0 text-xs font-medium px-2.5 py-1 rounded-lg">Pending</span>`;
+        c.innerHTML=`<div class="p-4"><div class="flex items-start justify-between gap-3 mb-2.5"><div class="flex-1 min-w-0"><h3 class="card-title font-bold text-[15px] leading-snug truncate font-bengali">${escapeHtml(m.name)}</h3><p class="card-meta text-xs mt-0.5 flex items-center gap-1.5">${ml}</p></div>${badge}</div>${timesHtml}</div>`;
         list.appendChild(c);
       });
       const rc=mosques.filter(m=>m.hasReport).length;
@@ -607,15 +644,16 @@
 
     function escapeHtml(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML;}
 
-    async function handleVote(btn,type,index){
-      const m=state.mosques[index]; if(!m||!m.hasReport||!m.reportId){showToast('No report to vote on.','warning');return;}
+    async function handleVote(btn,type,mosqueIndex,reportIndex){
+      const m=state.mosques[mosqueIndex]; if(!m||!m.hasReport||!m.reports[reportIndex]){showToast('No report to vote on.','warning');return;}
+      const r=m.reports[reportIndex];
       const p=btn.parentElement,all=p.querySelectorAll('.vote-btn'),voted=btn.classList.contains('voted-correct')||btn.classList.contains('voted-incorrect');
       all.forEach(b=>b.classList.remove('voted-correct','voted-incorrect'));
-      if(voted){if(type==='correct')m.upvotes=Math.max(0,m.upvotes-1);else m.downvotes=Math.max(0,m.downvotes-1);}
-      else{if(type==='correct'){m.upvotes++;btn.classList.add('voted-correct');}else{m.downvotes++;btn.classList.add('voted-incorrect');}}
-      all[0].querySelector('.vote-count').textContent=m.upvotes;all[1].querySelector('.vote-count').textContent=m.downvotes;
+      if(voted){if(type==='correct')r.upvotes=Math.max(0,r.upvotes-1);else r.downvotes=Math.max(0,r.downvotes-1);}
+      else{if(type==='correct'){r.upvotes++;btn.classList.add('voted-correct');}else{r.downvotes++;btn.classList.add('voted-incorrect');}}
+      all[0].querySelector('.vote-count').textContent=r.upvotes;all[1].querySelector('.vote-count').textContent=r.downvotes;
       if(!db)return;
-      try{const{error}=await db.from('jamaat_reports').update({upvotes:m.upvotes,downvotes:m.downvotes}).eq('id',m.reportId);if(error)throw error;}
+      try{const{error}=await db.from('jamaat_reports').update({upvotes:r.upvotes,downvotes:r.downvotes}).eq('id',r.id);if(error)throw error;}
       catch(e){console.error('Vote fail:',e);showToast('Vote failed to save.','error');}
     }
 
@@ -651,7 +689,12 @@
         const mk=new google.maps.Marker({position:{lat:m.lat,lng:m.lon},map:state.map,
           icon:{url:`data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' width='32' height='32'><circle cx='16' cy='16' r='14' fill='${reported?'%23065f46':'%239ca3af'}' stroke='white' stroke-width='2.5'/><text x='16' y='22' text-anchor='middle' font-size='16'>🕌</text></svg>`)}`,scaledSize:new google.maps.Size(32,32),anchor:new google.maps.Point(16,16)},
           title:m.name});
-        const pt=reported?`<div style="background:#ecfdf5;border-radius:8px;padding:6px 10px;margin-bottom:8px"><p style="font-size:12px;font-weight:600;color:#065f46">🕐 ${m.jamaatTime}</p></div><p style="font-size:11px;color:#9ca3af">${m.timeAgo}</p><div style="display:flex;gap:8px;margin-top:8px;font-size:12px"><span style="color:#059669;font-weight:500">✅ ${m.upvotes}</span><span style="color:#ef4444;font-weight:500">❌ ${m.downvotes}</span></div>`:'<p style="font-size:12px;color:#9ca3af;font-style:italic">Not reported yet</p>';
+        let pt;
+        if(reported){
+          pt = m.reports.map(r => `<div style="background:#ecfdf5;border-radius:8px;padding:6px 10px;margin-bottom:6px"><p style="font-size:12px;font-weight:600;color:#065f46">🕐 ${r.jamaatTime}</p><div style="display:flex;gap:8px;margin-top:4px;font-size:11px"><span style="color:#059669;font-weight:500">✅ ${r.upvotes}</span><span style="color:#ef4444;font-weight:500">❌ ${r.downvotes}</span><span style="color:#9ca3af">${r.timeAgo}</span></div></div>`).join('');
+        } else {
+          pt = '<p style="font-size:12px;color:#9ca3af;font-style:italic">Not reported yet</p>';
+        }
         mk.addListener('click',()=>{iw.setContent(`<div style="padding:14px;min-width:200px;font-family:Inter,'Noto Sans Bengali',sans-serif"><h3 style="font-weight:700;font-size:14px;color:#111827;margin-bottom:4px">${escapeHtml(m.name)}</h3><p style="font-size:12px;color:#6b7280;margin-bottom:8px">📍 ${m.distLabel} away</p>${pt}</div>`);iw.open(state.map,mk);});
         state.mapMarkers.push(mk);
       });
