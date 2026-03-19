@@ -242,7 +242,25 @@
     <h1 class="text-2xl font-bold mb-2 font-bengali">ঈদ জামাত কই</h1>
     <p class="text-emerald-300 text-sm animate-pulse" id="loading-text">Finding nearby mosques...</p>
     <p class="text-emerald-500 text-xs mt-1">কাছের মসজিদ খুঁজছে...</p>
+    <p id="loading-hadith" class="font-bengali text-emerald-200/80 text-xs mt-5 max-w-xs text-center leading-relaxed px-4 italic"></p>
   </div>
+  <script>
+    (function(){
+      const hadiths = [
+        'ইহা এমন একটি দিন যেদিন আল্লাহ তাঁদের জন্য খানাপিনাকে নির্ধারণ করেছেন। — সহীহ মুসলিম',
+        'যে ব্যক্তি রমযানের রোজা রাখে এবং ঈমানের সাথে, তার অতীতের গুনাহ মাফ করা হবে। — সহীহ বুখারী',
+        'নবী (সা) ঈদের দিন সালাতের আগে কিছু খেতেন না। — সহীহ বুখারী',
+        'তোমরা ঈদের দিন একে অপরকে মুবারকবাদ জানাও। — সহীহ বুখারী',
+        'ঈদের দিন নবী (সা) এক রাস্তায় যেতেন এবং অন্য রাস্তায় ফিরতেন। — সহীহ বুখারী',
+        'ঈদের সালাত দুই রাকাত। সালাতের পরে খুতবা দেওয়া হতো। — সহীহ বুখারী',
+        'আল্লাহ তাকবীর মাধ্যমে তোমাদের হেদায়ত করতে চান। — সূরা বাকারা (১৮৫)',
+        'যে ব্যক্তি লাইলাতুল কদরে দাঁড়ালো, তার সমস্ত গুনাহ মাফ করা হবে। — সহীহ বুখারী',
+        'ফিতরার সাদাকাহ সালাতের আগে আদায় করো। — সহীহ বুখারী',
+        'কুরবানীর দিন এবং তাশরীকের দিনগুলো খাওয়া এবং পান করার দিন। — সহীহ মুসলিম'
+      ];
+      document.getElementById('loading-hadith').textContent = '"' + hadiths[Math.floor(Math.random() * hadiths.length)] + '"';
+    })();
+  </script>
 
   <!-- TOAST -->
   <div id="toast-container" class="fixed bottom-20 left-1/2 -translate-x-1/2 z-[1020] flex flex-col gap-2 items-center pointer-events-none"></div>
