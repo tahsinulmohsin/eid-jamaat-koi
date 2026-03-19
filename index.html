@@ -349,7 +349,8 @@
       <form id="report-form" class="px-5 py-5 space-y-4">
         <div>
           <label class="modal-label block text-sm font-semibold mb-1.5">Mosque <span class="modal-label-hint font-bengali text-xs">(মসজিদ)</span></label>
-          <select id="modal-mosque-select" class="modal-input w-full rounded-xl px-3.5 py-2.5 text-sm outline-none transition-shadow">
+          <input type="text" id="modal-mosque-search" class="modal-input w-full rounded-xl px-3.5 py-2.5 text-sm outline-none transition-shadow mb-2" placeholder="🔍 Search mosque by name..." autocomplete="off" />
+          <select id="modal-mosque-select" class="modal-input w-full rounded-xl px-3.5 py-2.5 text-sm outline-none transition-shadow" style="max-height:180px">
             <option value="">Select a mosque...</option>
           </select>
         </div>
@@ -711,9 +712,20 @@
       const ov=document.getElementById('modal-overlay'),bo=document.getElementById('btn-add-time'),bc=document.getElementById('modal-close');
       const fm=document.getElementById('report-form'),ua=document.getElementById('upload-area'),fi=document.getElementById('modal-photo');
       const ul=document.getElementById('upload-label'),sb=document.getElementById('submit-btn'),sbt=document.getElementById('submit-btn-text'),sbs=document.getElementById('submit-btn-spinner');
+      function populateSelect(filter) {
+        const sel=document.getElementById('modal-mosque-select');
+        sel.innerHTML='<option value="">Select a mosque...</option>';
+        const q = (filter || '').toLowerCase();
+        state.mosques.forEach(m=>{
+          if (q && !m.name.toLowerCase().includes(q)) return;
+          const o=document.createElement('option');o.value=`${m.osmId}|${m.name}`;o.textContent=`${m.name} (${m.distLabel})`;sel.appendChild(o);
+        });
+      }
       function open(){ov.classList.remove('hidden');ov.classList.add('flex');document.body.style.overflow='hidden';
-        const sel=document.getElementById('modal-mosque-select');sel.innerHTML='<option value="">Select a mosque...</option>';
-        state.mosques.forEach(m=>{const o=document.createElement('option');o.value=`${m.osmId}|${m.name}`;o.textContent=`${m.name} (${m.distLabel})`;sel.appendChild(o);});}
+        const searchInp=document.getElementById('modal-mosque-search'); searchInp.value='';
+        populateSelect('');
+      }
+      document.getElementById('modal-mosque-search').addEventListener('input', e => populateSelect(e.target.value));
       function close(){ov.classList.add('hidden');ov.classList.remove('flex');document.body.style.overflow='';fm.reset();ul.textContent='📷 Tap to upload photo';setL(false);}
       function setL(l){sb.disabled=l;sbt.textContent=l?'Submitting...':'Submit Report / জমা দিন';sbs.classList.toggle('hidden',!l);sb.classList.toggle('opacity-70',l);sb.classList.toggle('cursor-not-allowed',l);}
       bo.addEventListener('click',open);bc.addEventListener('click',close);ov.addEventListener('click',e=>{if(e.target===ov)close();});
