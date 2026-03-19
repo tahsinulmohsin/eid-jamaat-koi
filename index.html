@@ -441,19 +441,68 @@
       });
     }
 
-    async function fetchMosquesFromOSM(lat, lon) {
-      const q = `[out:json][timeout:25];(nwr["amenity"="place_of_worship"]["religion"="muslim"](around:${SEARCH_RADIUS},${lat},${lon});nwr["place_of_worship"="eidgah"](around:${SEARCH_RADIUS},${lat},${lon}););out center;`;
+    async function fetchMosquesFromGooglePlaces(lat, lon) {
+      if (!window.google || !window.google.maps || !window.google.maps.places) {
+        showToast('Google Maps not loaded yet. Retrying...', 'warning');
+        return generateFallbackMosques(lat, lon);
+      }
+      
+      const loc = new google.maps.LatLng(lat, lon);
+      const service = new google.maps.places.PlacesService(document.createElement('div'));
+      
+      function fetchAllPages(request) {
+        let allResults = [];
+        return new Promise(resolve => {
+          service.nearbySearch(request, function callback(results, status, pagination) {
+            if (status === google.maps.places.PlacesServiceStatus.OK && results) {
+              allResults = allResults.concat(results);
+              if (pagination && pagination.hasNextPage) {
+                setTimeout(() => pagination.nextPage(), 2000);
+              } else {
+                resolve(allResults);
+              }
+            } else {
+              resolve(allResults);
+            }
+          });
+        });
+      }
+
       try {
-        const lt = document.getElementById('loading-text'); if (lt) lt.textContent = 'Finding nearby mosques...';
-        const ctrl = new AbortController(); const tid = setTimeout(() => ctrl.abort(), 25000);
-        const res = await fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(q)}`, { signal: ctrl.signal });
-        clearTimeout(tid); if (!res.ok) throw new Error('API error');
-        const data = await res.json();
-        const arr = (data.elements || []).map(e => { if (e.type!=='node'&&e.center) { e.lat=e.center.lat; e.lon=e.center.lon; } return e; }).filter(e => e.lat&&e.lon);
+        const lt = document.getElementById('loading-text'); if (lt) lt.textContent = 'Scanning Google Maps...';
+        
+        const req1 = { location: loc, radius: SEARCH_RADIUS, type: 'mosque' };
+        const req2 = { location: loc, radius: SEARCH_RADIUS, keyword: 'mosque' };
+        const req3 = { location: loc, radius: SEARCH_RADIUS, keyword: 'eidgah' };
+        
+        const [res1, res2, res3] = await Promise.all([
+          fetchAllPages(req1), fetchAllPages(req2), fetchAllPages(req3)
+        ]);
+        
+        const combined = [...res1, ...res2, ...res3];
+        const unique = {};
+        
+        combined.forEach(p => {
+          if (!unique[p.place_id]) {
+            unique[p.place_id] = {
+              type: 'node',
+              id: p.place_id,
+              lat: p.geometry.location.lat(),
+              lon: p.geometry.location.lng(),
+              tags: {
+                name: p.name,
+                amenity: 'place_of_worship',
+                religion: 'muslim'
+              }
+            };
+          }
+        });
+        
+        const arr = Object.values(unique);
         localStorage.setItem('cached_mosques', JSON.stringify({ lat, lon, data: arr }));
         return arr;
-      } catch(e) { 
-        console.error('Overpass fail:', e); 
+      } catch (e) {
+        console.error('Google Places fail:', e);
         const cached = localStorage.getItem('cached_mosques');
         if (cached) {
           try {
@@ -461,8 +510,8 @@
             if (Math.abs(p.lat-lat)<0.05 && Math.abs(p.lon-lon)<0.05) return p.data;
           } catch(x){}
         }
-        showToast('Could not fetch mosque data. Showing cached results.', 'warning'); 
-        return generateFallbackMosques(lat,lon); 
+        showToast('Could not fetch mosque data. Showing fallback lists results.', 'error');
+        return generateFallbackMosques(lat, lon);
       }
     }
 
@@ -658,12 +707,16 @@
       const ls=document.getElementById('loading-screen'),app=document.getElementById('app');
       try{
         const loc=await getUserLocation();state.userLat=loc.lat;state.userLon=loc.lon;state.usingDefault=loc.fallback;
-        const lt=document.getElementById('loading-text');if(lt)lt.textContent='Fetching mosque data...';
-        const[raw,rpts]=await Promise.all([fetchMosquesFromOSM(loc.lat,loc.lon),fetchReportsFromSupabase(),fetchEidDates()]);
+        
+        const lt=document.getElementById('loading-text');if(lt)lt.textContent='Connecting to Google Maps...';
+        await waitForGoogleMaps();
+        
+        if(lt)lt.textContent='Fetching location data...';
+        const[raw,rpts]=await Promise.all([fetchMosquesFromGooglePlaces(loc.lat,loc.lon),fetchReportsFromSupabase(),fetchEidDates()]);
+        
         state.rawOsmElements=raw;state.reports=rpts;if(lt)lt.textContent='Loading map...';
         state.mosques=mergeDataAndProcess(raw,rpts,loc.lat,loc.lon);
         renderFeed(state.mosques);
-        await waitForGoogleMaps();
         initMap(loc.lat,loc.lon,state.mosques);
         setupViewToggle();setupModal();setupDarkMode();setupSearch();
         if(loc.fallback)setTimeout(()=>showToast('Showing default area. Enable location for nearby results.','warning'),800);
