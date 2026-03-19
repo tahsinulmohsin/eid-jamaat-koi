@@ -442,7 +442,7 @@
     }
 
     async function fetchMosquesFromOSM(lat, lon) {
-      const q = `[out:json][timeout:25];(nwr["amenity"="place_of_worship"]["religion"="muslim"](around:${SEARCH_RADIUS},${lat},${lon});nwr["name"~"Eidgah|eidgah|EIDGAH|ঈদগাহ"](around:${SEARCH_RADIUS},${lat},${lon});nwr["place_of_worship"="eidgah"](around:${SEARCH_RADIUS},${lat},${lon}););out center;`;
+      const q = `[out:json][timeout:25];(nwr["amenity"="place_of_worship"]["religion"="muslim"](around:${SEARCH_RADIUS},${lat},${lon});nwr["place_of_worship"="eidgah"](around:${SEARCH_RADIUS},${lat},${lon}););out center;`;
       try {
         const lt = document.getElementById('loading-text'); if (lt) lt.textContent = 'Finding nearby mosques...';
         const ctrl = new AbortController(); const tid = setTimeout(() => ctrl.abort(), 25000);
