@@ -25,6 +25,7 @@ A mobile-first web app for discovering and reporting Eid prayer (Jamaat) timings
 - **New:** Eid dates now dynamically adjust based on user's **GPS location**. A custom longitudinal algorithm applies a +1-day offset for regions East of 60° longitude (South Asia, Southeast Asia, Oceania) to match real-world physical moon sighting practices.
 - **New:** Support for **multiple Jamaat time reports** at the same venue. Each mosque card and map popup now displays all reported times independently, each with its own voting buttons and timestamps.
 - **New:** Added a **real-time search filter** inside the Report Jamaat Time modal, allowing users to instantly find a specific mosque from 100+ results before submitting.
+- **New:** Loading screen now displays a **random Sahih Hadith** related to Eid in Bengali, curated from Bukhari and Muslim, for a meaningful waiting experience.
 
 ---
 
