@@ -471,15 +471,17 @@
       try {
         const lt = document.getElementById('loading-text'); if (lt) lt.textContent = 'Scanning Google Maps...';
         
-        const req1 = { location: loc, radius: SEARCH_RADIUS, type: 'mosque' };
-        const req2 = { location: loc, radius: SEARCH_RADIUS, keyword: 'mosque' };
-        const req3 = { location: loc, radius: SEARCH_RADIUS, keyword: 'eidgah' };
+        const queries = [
+          { location: loc, radius: SEARCH_RADIUS, type: 'mosque' },
+          { location: loc, radius: SEARCH_RADIUS, keyword: 'Eidgah' },
+          { location: loc, radius: SEARCH_RADIUS, keyword: 'masjid' },
+          { location: loc, radius: SEARCH_RADIUS, keyword: 'mosjid' },
+          { location: loc, radius: SEARCH_RADIUS, keyword: 'ঈদ্গাহ' },
+          { location: loc, radius: SEARCH_RADIUS, keyword: 'মসজিদ' }
+        ];
         
-        const [res1, res2, res3] = await Promise.all([
-          fetchAllPages(req1), fetchAllPages(req2), fetchAllPages(req3)
-        ]);
-        
-        const combined = [...res1, ...res2, ...res3];
+        const results = await Promise.all(queries.map(q => fetchAllPages(q)));
+        const combined = results.flat();
         const unique = {};
         
         combined.forEach(p => {
