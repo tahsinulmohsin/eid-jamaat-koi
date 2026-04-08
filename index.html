@@ -492,11 +492,7 @@
         
         const queries = [
           { location: loc, radius: SEARCH_RADIUS, type: 'mosque' },
-          { location: loc, radius: SEARCH_RADIUS, keyword: 'Eidgah' },
-          { location: loc, radius: SEARCH_RADIUS, keyword: 'masjid' },
-          { location: loc, radius: SEARCH_RADIUS, keyword: 'mosjid' },
-          { location: loc, radius: SEARCH_RADIUS, keyword: 'ঈদ্গাহ' },
-          { location: loc, radius: SEARCH_RADIUS, keyword: 'মসজিদ' }
+          { location: loc, radius: SEARCH_RADIUS, keyword: 'eidgah' }
         ];
         
         const results = await Promise.all(queries.map(q => fetchAllPages(q)));
@@ -555,6 +551,25 @@
       catch(e) { console.error('Supabase fetch fail:', e); return []; }
     }
 
+    function getEidAdjustment() {
+      // Map timezone to moon sighting region for accurate Eid dates
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+      // South Asia: Bangladesh, India, Pakistan, Sri Lanka — typically +1 day after Saudi
+      if (/Dhaka|Kolkata|Karachi|Colombo/.test(tz)) return 1;
+      // Southeast Asia: Malaysia, Indonesia, Singapore, Thailand — typically +1
+      if (/Jakarta|Kuala_Lumpur|Singapore|Bangkok|Manila/.test(tz)) return 1;
+      // Central/East Asia
+      if (/Shanghai|Hong_Kong|Tokyo|Seoul/.test(tz)) return 1;
+      // Turkey, Iran, Afghanistan — sometimes +1
+      if (/Istanbul|Tehran|Kabul/.test(tz)) return 1;
+      // Middle East (Saudi, UAE, Qatar, Kuwait, Bahrain, Oman) — reference point, 0
+      if (/Riyadh|Dubai|Qatar|Kuwait|Bahrain|Muscat/.test(tz)) return 0;
+      // Africa — generally follows Saudi or local sighting, 0
+      if (/Cairo|Lagos|Nairobi|Casablanca/.test(tz)) return 0;
+      // Western countries (US, Canada, UK, Europe) — communities vary, default to Saudi-following (0)
+      return 0;
+    }
+
     async function fetchEidDates(lat, lon) {
       try {
         const today = new Date();
@@ -566,8 +581,7 @@
         let nF = hYear; if (hMonth > 10) nF++;
         let nA = hYear; if (hMonth > 12 || (hMonth === 12 && parseInt(tData.data.hijri.day, 10) > 10)) nA++;
         
-        // Geographical adjustment for physical moon sighting rules (South Asia / East usually delayed by 1 day)
-        let adj = (lon >= 60) ? 1 : 0;
+        const adj = getEidAdjustment();
         
         const [fRes, aRes] = await Promise.all([
           fetch('https://api.aladhan.com/v1/hToG?date=01-10-' + nF + '&adjustment=' + adj),
