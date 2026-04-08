@@ -37,8 +37,9 @@
   <!-- Google Maps JS API (with Places Library) -->
   <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyB1LWJhPEmGOtcdAUCrLDlFWfjXQju5_XA&libraries=places&v=weekly" async defer></script>
 
-  <!-- Supabase JS Client -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <!-- Firebase JS SDK (compat for CDN) -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
 
   <!-- Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -421,15 +422,20 @@
       });
     }
 
-    // ===== SUPABASE =====
-    const SUPABASE_URL = 'https://vipnubhujyfbfujdgchj.supabase.co';
-    const SUPABASE_KEY = 'sb_publishable_15vFo2GC3m_CJD0-Oou0pQ_RiipId-l';
+    // ===== FIREBASE =====
     let db = null;
     try {
-      if (window.supabase && window.supabase.createClient && SUPABASE_URL !== 'YOUR_SUPABASE_URL') {
-        db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-      }
-    } catch (e) { console.warn('Supabase init failed:', e); }
+      firebase.initializeApp({
+        apiKey: "AIzaSyBKWEIFN8S7ElOsfwe9UB5LNNxUOZRmohE",
+        authDomain: "eid-jamaat-koi.firebaseapp.com",
+        databaseURL: "https://eid-jamaat-koi-default-rtdb.asia-southeast1.firebasedatabase.app",
+        projectId: "eid-jamaat-koi",
+        storageBucket: "eid-jamaat-koi.firebasestorage.app",
+        messagingSenderId: "960347882700",
+        appId: "1:960347882700:web:305949684871117b942e69"
+      });
+      db = firebase.database();
+    } catch (e) { console.warn('Firebase init failed:', e); }
 
     // ===== STATE =====
     const state = { userLat: null, userLon: null, mosques: [], reports: [], reportsMap: {}, map: null, activeView: 'feed', usingDefault: false };
@@ -547,8 +553,12 @@
 
     async function fetchReportsFromSupabase() {
       if (!db) return [];
-      try { const {data,error} = await db.from('jamaat_reports').select('*'); if(error) throw error; return data||[]; }
-      catch(e) { console.error('Supabase fetch fail:', e); return []; }
+      try {
+        const snap = await db.ref('jamaat_reports').once('value');
+        const val = snap.val();
+        if (!val) return [];
+        return Object.entries(val).map(([key, r]) => ({ ...r, id: key, created_at: r.created_at || null }));
+      } catch(e) { console.error('Firebase fetch fail:', e); return []; }
     }
 
     function getEidAdjustment() {
@@ -686,7 +696,7 @@
       else{if(type==='correct'){r.upvotes++;btn.classList.add('voted-correct');}else{r.downvotes++;btn.classList.add('voted-incorrect');}}
       all[0].querySelector('.vote-count').textContent=r.upvotes;all[1].querySelector('.vote-count').textContent=r.downvotes;
       if(!db)return;
-      try{const{error}=await db.from('jamaat_reports').update({upvotes:r.upvotes,downvotes:r.downvotes}).eq('id',r.id);if(error)throw error;}
+      try{await db.ref('jamaat_reports/' + r.id).update({upvotes:r.upvotes,downvotes:r.downvotes});}
       catch(e){console.error('Vote fail:',e);showToast('Vote failed to save.','error');}
     }
 
@@ -764,8 +774,9 @@
       ua.addEventListener('click',()=>fi.click());fi.addEventListener('change',()=>{if(fi.files.length>0)ul.textContent=`📎 ${fi.files[0].name}`;});
       fm.addEventListener('submit',async e=>{e.preventDefault();const mv=document.getElementById('modal-mosque-select').value,tm=document.getElementById('modal-time').value;
         if(!mv||!tm){showToast('Please select a mosque and time.','error');return;}const[oid,mn]=mv.split('|');setL(true);
-        try{if(!db)throw new Error('DB not connected');const{error}=await db.from('jamaat_reports').insert({osm_node_id:oid,mosque_name:mn,jamaat_time:tm,upvotes:0,downvotes:0}).select();
-          if(error)throw error;showToast('Time added successfully! সময় যোগ হয়েছে! ✅','success');close();await refreshData();}
+        try{if(!db)throw new Error('DB not connected');
+          await db.ref('jamaat_reports').push({osm_node_id:oid,mosque_name:mn,jamaat_time:tm,upvotes:0,downvotes:0,created_at:new Date().toISOString()});
+          showToast('Time added successfully! সময় যোগ হয়েছে! ✅','success');close();await refreshData();}
         catch(e){console.error('Insert fail:',e);showToast('Failed to submit. Please try again.','error');setL(false);}});
     }
 
